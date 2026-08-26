@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Background circle -->
+  <circle cx="32" cy="32" r="32" fill="#1a1a2e"/>
+  <!-- Outer glow ring -->
+  <circle cx="32" cy="32" r="29" fill="none" stroke="#f5c518" stroke-width="1.5" opacity="0.35"/>
+  <!-- Lightning bolt shape -->
+  <path d="M36 6 L18 34 H30 L28 58 L46 26 H34 Z"
+        fill="#f5c518"
+        stroke="#fff8dc"
+        stroke-width="1"
+        stroke-linejoin="round"
+        paint-order="stroke"/>
+  <!-- Inner highlight on bolt -->
+  <path d="M34 10 L22 34 H32 L31 50 L42 28 H33 Z"
+        fill="url(#boltGrad)"
+        opacity="0.5"/>
+  <defs>
+    <linearGradient id="boltGrad" x1="34" y1="10" x2="31" y2="50" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#f5c518" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+</svg>

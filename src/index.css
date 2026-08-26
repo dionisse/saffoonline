@@ -1,0 +1,198 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Base ───────────────────────────────────────────────────────────────── */
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-brand-surface text-brand-dark;
+  }
+  h1, h2, h3, h4, h5, h6 { line-height: 1.2; }
+  p { line-height: 1.5; }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* ─── Components ─────────────────────────────────────────────────────────── */
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5
+           bg-brand-accent hover:bg-brand-accent-dark active:scale-95
+           text-brand-dark font-semibold rounded-md
+           transition-all duration-150
+           focus:outline-none focus:ring-2 focus:ring-brand-accent focus:ring-offset-2
+           disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5
+           bg-white hover:bg-brand-surface active:scale-95
+           text-brand-dark border border-brand-border font-medium rounded-md
+           transition-all duration-150
+           focus:outline-none focus:ring-2 focus:ring-brand-primary focus:ring-offset-2;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-3 py-2
+           text-brand-muted hover:text-brand-primary hover:bg-brand-surface active:scale-95
+           rounded-md transition-all duration-150;
+  }
+  .input {
+    @apply w-full px-3 py-2.5 border border-brand-border rounded-md text-sm
+           focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent
+           transition-all duration-150 bg-white;
+  }
+  .card {
+    @apply bg-white border border-brand-border rounded-lg overflow-hidden;
+  }
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 text-xs font-medium rounded;
+  }
+
+  /* Product card with hover lift */
+  .product-card {
+    @apply card flex flex-col cursor-pointer
+           transition-all duration-300 ease-out
+           hover:-translate-y-1.5 hover:shadow-xl
+           hover:border-brand-accent/60;
+  }
+
+  /* Shimmer skeleton */
+  .skeleton {
+    @apply rounded bg-gradient-to-r from-brand-border via-brand-surface to-brand-border
+           bg-[length:200%_100%];
+    animation: shimmer 1.5s infinite linear;
+  }
+
+  /* Toast notification */
+  .toast {
+    @apply fixed bottom-6 left-1/2 z-[200]
+           flex items-center gap-2.5 px-5 py-3
+           text-white text-sm font-medium
+           rounded-2xl shadow-2xl pointer-events-none
+           select-none;
+    transform: translateX(-50%);
+    animation: toastIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  .toast-success { @apply bg-brand-success; }
+  .toast-error   { @apply bg-brand-danger; }
+  .toast-info    { @apply bg-brand-primary; }
+
+  /* Page enter animation */
+  .page-enter {
+    animation: pageEnter 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+}
+
+/* ─── Utilities ─────────────────────────────────────────────────────────── */
+@layer utilities {
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
+  .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  .will-transform { will-change: transform; }
+}
+
+/* ─── Keyframes ─────────────────────────────────────────────────────────── */
+
+@keyframes pageEnter {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(22px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.93); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(20px) scale(0.9); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0)    scale(1); }
+}
+
+@keyframes toastOut {
+  from { opacity: 1; transform: translateX(-50%) translateY(0)    scale(1); }
+  to   { opacity: 0; transform: translateX(-50%) translateY(20px) scale(0.9); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
+}
+
+@keyframes badgeBounce {
+  0%, 100% { transform: scale(1); }
+  30%       { transform: scale(1.55); }
+  60%       { transform: scale(0.85); }
+}
+
+@keyframes ripple {
+  from { transform: scale(0); opacity: 0.4; }
+  to   { transform: scale(4.5); opacity: 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-10px); }
+}
+
+@keyframes pulseRing {
+  0%   { box-shadow: 0 0 0 0   rgba(40, 167, 69, 0.55); }
+  70%  { box-shadow: 0 0 0 12px rgba(40, 167, 69, 0); }
+  100% { box-shadow: 0 0 0 0   rgba(40, 167, 69, 0); }
+}
+
+@keyframes successPop {
+  0%   { transform: scale(0.6); opacity: 0; }
+  60%  { transform: scale(1.2); opacity: 1; }
+  100% { transform: scale(1);   opacity: 1; }
+}
+
+@keyframes countUp {
+  0%   { transform: translateY(8px);  opacity: 0; }
+  100% { transform: translateY(0);    opacity: 1; }
+}
+
+@keyframes checkDraw {
+  from { stroke-dashoffset: 50; opacity: 0; }
+  to   { stroke-dashoffset: 0;  opacity: 1; }
+}
+
+/* ─── Animation utility classes ─────────────────────────────────────────── */
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.animate-fade-in-scale {
+  animation: fadeInScale 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.animate-float {
+  animation: float 3.8s ease-in-out infinite;
+}
+.animate-toast-out {
+  animation: toastOut 0.28s ease-in both;
+}
+.animate-badge-bounce {
+  animation: badgeBounce 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.animate-pulse-ring {
+  animation: pulseRing 0.75s ease-out;
+}
+.animate-success-pop {
+  animation: successPop 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.animate-count-up {
+  animation: countUp 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
+}

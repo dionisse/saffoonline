@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#714B67" />
+    <meta name="description" content="MagasinPro - Gestion de magasin: catalogue, commandes, POS et stock." />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- Font preconnect for faster load -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- font-display=swap ensures text visible during font load -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <!-- Preconnect to Supabase CDN -->
+    <link rel="preconnect" href="https://wqgpfbuaigizbhtmqamx.supabase.co" />
+    <title>MagasinPro - Gestion de Magasin</title>
+    <style>
+      /* Prevent FOUC: show surface color immediately */
+      body { background: #F8F9FA; }
+      #root { min-height: 100vh; }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(() => {});
+        });
+      }
+    </script>
+  </body>
+</html>

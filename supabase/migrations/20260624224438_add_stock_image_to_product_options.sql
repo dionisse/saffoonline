@@ -1,0 +1,3 @@
+ALTER TABLE product_options
+  ADD COLUMN IF NOT EXISTS stock integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS image_url text DEFAULT NULL;
