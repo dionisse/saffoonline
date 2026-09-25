@@ -9,11 +9,15 @@ interface AuthContextValue {
   profile: Profile | null;
   allowedModules: AdminModule[] | null;
   loading: boolean;
+  isPasswordRecovery: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string, fullName: string, phone: string) => Promise<{ error: string | null }>;
+  resetPassword: (email: string) => Promise<{ error: string | null }>;
+  updatePassword: (password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   canAccess: (module: AdminModule) => boolean;
   reloadProfile: () => Promise<void>;
+  clearRecoveryMode: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -23,9 +27,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [allowedModules, setAllowedModules] = useState<AdminModule[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
 
   useEffect(() => {
     let mounted = true;
+
+    // Check if URL indicates password recovery
+    if (typeof window !== 'undefined') {
+      const hash = window.location.hash || '';
+      const search = window.location.search || '';
+      if (hash.includes('type=recovery') || search.includes('reset=password')) {
+        setIsPasswordRecovery(true);
+      }
+    }
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!mounted) return;
@@ -34,8 +48,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       else setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsPasswordRecovery(true);
+      }
       if (session?.user) {
         (async () => { await loadProfile(session.user.id); })();
       } else {
@@ -116,14 +133,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null };
   }
 
+  async function resetPassword(email: string) {
+    const redirectTo = typeof window !== 'undefined'
+      ? `${window.location.origin}/?reset=password`
+      : undefined;
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+    return { error: error?.message ?? null };
+  }
+
+  async function updatePassword(password: string) {
+    const { error } = await supabase.auth.updateUser({ password });
+    if (!error) setIsPasswordRecovery(false);
+    return { error: error?.message ?? null };
+  }
+
+  function clearRecoveryMode() {
+    setIsPasswordRecovery(false);
+  }
+
   async function signOut() {
     await supabase.auth.signOut();
     setProfile(null);
     setAllowedModules(null);
+    setIsPasswordRecovery(false);
   }
 
   return (
-    <AuthContext.Provider value={{ session, user: session?.user ?? null, profile, allowedModules, loading, signIn, signUp, signOut, canAccess, reloadProfile }}>
+    <AuthContext.Provider value={{
+      session,
+      user: session?.user ?? null,
+      profile,
+      allowedModules,
+      loading,
+      isPasswordRecovery,
+      signIn,
+      signUp,
+      resetPassword,
+      updatePassword,
+      signOut,
+      canAccess,
+      reloadProfile,
+      clearRecoveryMode,
+    }}>
       {children}
     </AuthContext.Provider>
   );
