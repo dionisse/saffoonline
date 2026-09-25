@@ -5,7 +5,7 @@ import {
   ShoppingBasket, CreditCard, ShieldCheck, Phone,
   Megaphone, TicketPercent, Radio, Search,
   Heart, MapPin, Mail, ChevronDown, CheckCircle2,
-  Trash2,
+  Trash2, Users,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useCart, getEffectivePrice } from '../contexts/CartContext';
@@ -13,6 +13,7 @@ import { useWishlist } from '../contexts/WishlistContext';
 import { useStoreSettings } from '../contexts/StoreSettingsContext';
 import { formatPrice } from '../lib/format';
 import { DEFAULT_CATEGORIES } from '../data/breweryCatalog';
+import { SmartBreweryAssistant } from './SmartBreweryAssistant';
 import type { View } from '../lib/views';
 
 // ─── Social icon SVGs ────────────────────────────────────────────────────────
@@ -82,6 +83,7 @@ export function AppShell({ view, setView, children }: { view: View; setView: (v:
 
   const ALL_ADMIN_NAV = [
     { kind: 'admin-dashboard' as const,  icon: <LayoutDashboard className="w-4 h-4" />, label: 'Dashboard' },
+    { kind: 'admin-customers' as const,  icon: <Users className="w-4 h-4" />,           label: 'Suivi Clients' },
     { kind: 'admin-products' as const,   icon: <Boxes className="w-4 h-4" />,           label: 'Produits' },
     { kind: 'admin-stock' as const,      icon: <Warehouse className="w-4 h-4" />,        label: 'Stocks' },
     { kind: 'admin-purchases' as const,  icon: <ShoppingBasket className="w-4 h-4" />,   label: 'Appros' },
@@ -890,6 +892,9 @@ export function AppShell({ view, setView, children }: { view: View; setView: (v:
           </div>
         </div>
       </footer>
+
+      {/* Intelligent AI Brewery Assistant for Customer guidance, event calculations, bonus unlocks, and Admin co-piloting */}
+      <SmartBreweryAssistant isAdmin={isAdminView} setView={setView} />
     </div>
   );
 }

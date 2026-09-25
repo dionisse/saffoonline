@@ -2,6 +2,7 @@ export type UserRole = 'admin' | 'cashier' | 'employee' | 'customer';
 
 export type AdminModule =
   | 'admin-dashboard'
+  | 'admin-customers'
   | 'admin-products'
   | 'admin-categories'
   | 'admin-orders'

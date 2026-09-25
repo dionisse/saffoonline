@@ -9,6 +9,7 @@ import { AuthPage } from './pages/AuthPage';
 import { LegalPage } from './pages/LegalPage';
 import { AdminSetupPage } from './pages/AdminSetupPage';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
+import { AdminCustomers } from './pages/admin/AdminCustomers';
 import { AdminProducts } from './pages/admin/AdminProducts';
 import { AdminCategories } from './pages/admin/AdminCategories';
 import { AdminOrders } from './pages/admin/AdminOrders';
@@ -87,6 +88,7 @@ function App() {
       {view.kind === 'terms' && <LegalPage kind="terms" setView={setView} />}
       {view.kind === 'admin-setup' && <AdminSetupPage setView={setView} />}
       {view.kind === 'admin-dashboard' && <AdminDashboard setView={setView} />}
+      {view.kind === 'admin-customers' && <AdminCustomers />}
       {view.kind === 'admin-products' && <AdminProducts />}
       {view.kind === 'admin-categories' && <AdminCategories />}
       {view.kind === 'admin-orders' && <AdminOrders />}

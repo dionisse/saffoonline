@@ -27,6 +27,9 @@ export default defineConfig({
   },
   // Better caching in dev
   server: {
+    host: '0.0.0.0',
+    port: 5173,
+    strictPort: true,
     headers: {
       'Cache-Control': 'public, max-age=31536000, immutable',
     },

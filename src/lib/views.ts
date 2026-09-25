@@ -10,6 +10,7 @@ export type View =
   | { kind: 'terms' }
   | { kind: 'admin-setup' }
   | { kind: 'admin-dashboard' }
+  | { kind: 'admin-customers' }
   | { kind: 'admin-products' }
   | { kind: 'admin-categories' }
   | { kind: 'admin-orders' }

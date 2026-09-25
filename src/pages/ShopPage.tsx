@@ -1212,11 +1212,11 @@ export function ShopPage({ setView, initialCategoryId, initialSearch }: ShopPage
 
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-gray-500 uppercase">Trier :</span>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className="text-xs bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none cursor-pointer"
-            >
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as 'recent' | 'price-asc' | 'price-desc' | 'name')}
+                className="text-xs bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none cursor-pointer"
+              >
               <option value="recent">Plus récents</option>
               <option value="price-asc">Prix : Croissant</option>
               <option value="price-desc">Prix : Décroissant</option>

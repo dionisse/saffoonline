@@ -177,7 +177,7 @@ export function AdminPurchases() {
   }
 
   // ── Cancel purchase ───────────────────────────────────────────────────────
-  async function cancelPurchase(id: string, _currentStatus?: string) {
+  async function cancelPurchase(id: string) {
     if (!confirm('Confirmer l\'annulation ? Le stock sera reversé si l\'approvisionnement était validé.')) return;
     setActionLoading(id + '-cancel');
     await supabase.from('purchases').update({ status: 'cancelled', updated_at: new Date().toISOString() }).eq('id', id);
@@ -486,7 +486,7 @@ export function AdminPurchases() {
                           )}
                           {p.status === 'validated' && (
                             <button
-                              onClick={() => cancelPurchase(p.id, p.status)}
+                              onClick={() => cancelPurchase(p.id)}
                               disabled={actionLoading === p.id + '-cancel'}
                               title="Annuler (le stock sera reversé)"
                               className="flex items-center gap-1 px-2 py-1 text-xs font-medium bg-brand-danger/10 text-brand-danger hover:bg-brand-danger/20 rounded-md transition disabled:opacity-50">
