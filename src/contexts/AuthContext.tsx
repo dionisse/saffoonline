@@ -12,6 +12,7 @@ interface AuthContextValue {
   isPasswordRecovery: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signUp: (email: string, password: string, fullName: string, phone: string) => Promise<{ error: string | null }>;
+  signInWithGoogle: () => Promise<{ error: string | null }>;
   resetPassword: (email: string) => Promise<{ error: string | null }>;
   updatePassword: (password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
@@ -73,7 +74,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq('id', userId)
       .maybeSingle();
 
-    const prof = baseProfile as Profile | null;
+    let prof = baseProfile as Profile | null;
+
+    // Step 1.5: If user logged in via OAuth (e.g. Google), auto-create customer profile if missing
+    if (!prof) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user && user.id === userId) {
+        const metadata = user.user_metadata ?? {};
+        const fullName = metadata.full_name || metadata.name || user.email?.split('@')[0] || 'Client Saffo';
+        const phone = metadata.phone || '';
+        const newProf: Profile = {
+          id: userId,
+          full_name: fullName,
+          phone,
+          role: 'customer',
+          section_id: null,
+          employee_number: '',
+          created_at: new Date().toISOString(),
+        };
+        await supabase.from('profiles').upsert(newProf);
+        prof = newProf;
+      }
+    }
+
     setProfile(prof);
 
     if (!prof) {
@@ -124,6 +147,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error?.message ?? null };
   }
 
+  async function signInWithGoogle() {
+    const redirectTo = typeof window !== 'undefined'
+      ? `${window.location.origin}`
+      : undefined;
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'select_account',
+        },
+      },
+    });
+    return { error: error?.message ?? null };
+  }
+
   async function signUp(email: string, password: string, fullName: string, phone: string) {
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) return { error: error.message };
@@ -168,6 +208,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isPasswordRecovery,
       signIn,
       signUp,
+      signInWithGoogle,
       resetPassword,
       updatePassword,
       signOut,
