@@ -28,10 +28,10 @@
 @layer components {
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2 px-4 py-2.5
-           bg-brand-accent hover:bg-brand-accent-dark active:scale-95
-           text-brand-dark font-semibold rounded-md
+           bg-[#D10024] hover:bg-[#A8001D] active:scale-95
+           text-white font-semibold rounded-md
            transition-all duration-150
-           focus:outline-none focus:ring-2 focus:ring-brand-accent focus:ring-offset-2
+           focus:outline-none focus:ring-2 focus:ring-[#D10024] focus:ring-offset-2
            disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100;
   }
   .btn-secondary {
@@ -45,6 +45,21 @@
     @apply inline-flex items-center justify-center gap-2 px-3 py-2
            text-brand-muted hover:text-brand-primary hover:bg-brand-surface active:scale-95
            rounded-md transition-all duration-150;
+  }
+  .btn-electro {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
+           bg-[#D10024] hover:bg-[#A8001D] active:scale-95
+           text-white text-xs font-bold uppercase tracking-wider rounded-full
+           transition-all duration-200 shadow-md hover:shadow-lg
+           focus:outline-none focus:ring-2 focus:ring-[#D10024] focus:ring-offset-1;
+  }
+  .btn-electro-outline {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5
+           bg-white hover:bg-[#D10024] active:scale-95
+           text-[#2B2D42] hover:text-white border-2 border-[#E4E7ED] hover:border-[#D10024]
+           text-xs font-bold uppercase tracking-wider rounded-full
+           transition-all duration-200 shadow-sm
+           focus:outline-none focus:ring-2 focus:ring-[#D10024];
   }
   .input {
     @apply w-full px-3 py-2.5 border border-brand-border rounded-md text-sm

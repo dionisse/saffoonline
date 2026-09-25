@@ -76,7 +76,7 @@ function App() {
 
   return (
     <AppShell view={view} setView={setView}>
-      {view.kind === 'shop' && <ShopPage setView={setView} />}
+      {view.kind === 'shop' && <ShopPage setView={setView} initialCategoryId={view.categoryId} initialSearch={view.search} />}
       {view.kind === 'product' && <ProductPage id={view.id} setView={setView} />}
       {view.kind === 'cart' && <CartPage setView={setView} />}
       {view.kind === 'checkout' && <CheckoutPage setView={setView} />}
