@@ -19,6 +19,7 @@ import {
   DEFAULT_BANNERS,
   DEFAULT_PUBLICATIONS,
   DEFAULT_TESTIMONIALS,
+  DEFAULT_PACK_BREAKDOWNS,
 } from '../data/breweryCatalog';
 
 // ─── Social icon SVGs ────────────────────────────────────────────────────────
@@ -969,6 +970,25 @@ function QuickViewModal({
             <p className="text-xs text-gray-600 leading-relaxed">
               {product.description}
             </p>
+
+            {/* Pack Breakdown Preview if applicable */}
+            {DEFAULT_PACK_BREAKDOWNS[product.id] && (
+              <div className="p-3 bg-red-50/60 border border-red-200 rounded-xl space-y-1.5">
+                <p className="text-[11px] font-black uppercase text-[#D10024] flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-[#FFB300]" />
+                  <span>Composition du Pack Cérémonie Dot & Mariage :</span>
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-[11px]">
+                  {DEFAULT_PACK_BREAKDOWNS[product.id].map((it, idx) => (
+                    <div key={idx} className="flex items-center gap-1.5 bg-white p-1.5 rounded border border-red-100">
+                      <span>{it.icon}</span>
+                      <span className="font-bold text-gray-900">{it.quantity} ×</span>
+                      <span className="truncate text-gray-700">{it.name.split(' ')[0]} {it.name.split(' ')[1] || ''}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Quantity Selector + Add to Cart */}
             <div className="pt-2 space-y-3">

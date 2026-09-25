@@ -215,6 +215,14 @@ export interface OrderItem {
   subtotal: number;
 }
 
+export interface PackBreakdownItem {
+  icon?: string;
+  name: string;
+  quantity: number;
+  unit: string;
+  note?: string;
+}
+
 export interface CartItem {
   product: Product;
   quantity: number;
@@ -222,6 +230,10 @@ export interface CartItem {
   optionLabel?: string;   // e.g., "L / Rouge"
   priceModifier?: number; // sum of selected option modifiers
   optionStock?: number;   // stock of the selected option (if applicable)
+  packBreakdown?: PackBreakdownItem[]; // Detailed proposition list of drinks
+  eventGuests?: number;
+  eventType?: string;
+  customTitle?: string;
 }
 
 export interface Expense {

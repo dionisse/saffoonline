@@ -5,6 +5,7 @@ import {
 import { useCart } from '../contexts/CartContext';
 import { formatPrice } from '../lib/format';
 import { DEFAULT_PRODUCTS } from '../data/breweryCatalog';
+import type { PackBreakdownItem } from '../lib/database.types';
 import { useToast } from './ui';
 import type { View } from '../lib/views';
 
@@ -28,6 +29,7 @@ interface Message {
     wineBottles: number;
     iceBags: number;
     estimatedCost: number;
+    breakdown: PackBreakdownItem[];
   };
 }
 
@@ -37,6 +39,63 @@ interface SmartBreweryAssistantProps {
 }
 
 const PREF_STORAGE_KEY = 'saffo_assistant_user_prefs';
+
+function computeEventBreakdown(guests: number, eventType = 'Dot & Mariage') {
+  const safeGuests = Math.max(10, Math.min(2000, guests));
+  const cratesBeer = Math.max(2, Math.ceil(safeGuests * 0.12));
+  const cratesSofts = Math.max(1, Math.ceil(safeGuests * 0.04));
+  const packsWater = Math.max(1, Math.ceil(safeGuests * 0.05));
+  const wineBottles = Math.max(2, Math.ceil(safeGuests * 0.10));
+  const iceBags = Math.max(1, Math.ceil(safeGuests * 0.03));
+  const estimatedCost = cratesBeer * 6800 + cratesSofts * 4800 + packsWater * 3000 + wineBottles * 4500;
+
+  const breakdown: PackBreakdownItem[] = [
+    {
+      icon: '🍺',
+      name: 'La Béninoise 65cl (Bouteilles verre consignées)',
+      quantity: cratesBeer,
+      unit: `${cratesBeer} casiers (${cratesBeer * 24} bouteilles)`,
+      note: 'Glacé',
+    },
+    {
+      icon: '🥤',
+      name: 'Youki Cocktail & Pamplemousse 50cl',
+      quantity: cratesSofts,
+      unit: `${cratesSofts} casiers (${cratesSofts * 24} bouteilles)`,
+    },
+    {
+      icon: '💧',
+      name: 'Eau Minérale Naturelle Possotomé 1.5L',
+      quantity: packsWater,
+      unit: `${packsWater} packs (${packsWater * 6} bouteilles)`,
+    },
+    {
+      icon: '🍾',
+      name: 'Baron de Lestac Bordeaux Supérieur 75cl',
+      quantity: wineBottles,
+      unit: `${wineBottles} bouteilles`,
+    },
+    {
+      icon: '🧊',
+      name: 'Sacs de Glaçons Alimentaires Purifiés 5kg',
+      quantity: iceBags,
+      unit: `${iceBags} sacs de 5kg`,
+      note: 'OFFERT par SAFFO',
+    },
+  ];
+
+  return {
+    guests: safeGuests,
+    eventType,
+    cratesBeer,
+    cratesSofts,
+    packsWater,
+    wineBottles,
+    iceBags,
+    estimatedCost,
+    breakdown,
+  };
+}
 
 export function SmartBreweryAssistant({ isAdmin, setView }: SmartBreweryAssistantProps) {
   const { items, addToCart } = useCart();
@@ -214,44 +273,113 @@ export function SmartBreweryAssistant({ isAdmin, setView }: SmartBreweryAssistan
       const guests = parseInt(actionId.replace('calc_guests_', ''), 10);
       setMessages((prev) => [
         ...prev,
-        { id: 'usr-' + Date.now(), sender: 'user', text: `Nous serons environ ${guests} invités.` },
+        { id: 'usr-' + Date.now(), sender: 'user', text: `Nous serons environ ${guests} invités pour notre événement.` },
       ]);
 
-      const cratesBeer = Math.ceil(guests * 0.12);
-      const cratesSofts = Math.ceil(guests * 0.04);
-      const packsWater = Math.ceil(guests * 0.05);
-      const wineBottles = Math.ceil(guests * 0.1);
-      const iceBags = Math.ceil(guests * 0.03);
-      const estimatedCost = cratesBeer * 6800 + cratesSofts * 4800 + packsWater * 3000 + wineBottles * 4000;
+      const estimation = computeEventBreakdown(guests, 'Dot & Mariage');
 
       addAssistantResponse(
-        `Voici mon calcul optimisé pour ${guests} convives selon les normes des réceptions au Bénin :`,
+        `Voici ma proposition détaillée de boissons pour ${guests} convives. Chaque quantité a été calculée selon les standards des réceptions au Bénin :\n\n` +
+        `• 🍺 **${estimation.cratesBeer} Casiers** de La Béninoise 65cl (${estimation.cratesBeer * 24} bouteilles)\n` +
+        `• 🥤 **${estimation.cratesSofts} Casiers** de Youki Cocktail & Pamplemousse (${estimation.cratesSofts * 24} bouteilles)\n` +
+        `• 💧 **${estimation.packsWater} Packs** d'Eau Minérale Possotomé 1.5L (${estimation.packsWater * 6} bouteilles)\n` +
+        `• 🍾 **${estimation.wineBottles} Bouteilles** de Vin Baron de Lestac Bordeaux Supérieur\n` +
+        `• 🧊 **${estimation.iceBags} Sacs de Glaçons Purifiés 5kg (OFFERT par SAFFO)**\n\n` +
+        `Comment souhaitez-vous ajouter cette proposition à votre commande ?`,
         [
-          { label: '🛒 Ajouter ce pack complet au panier', actionId: 'apply_pack_cart', icon: '🛒' },
-          { label: '📲 Envoyer cette estimation sur WhatsApp', actionId: 'export_estimation_wa', icon: '📲' },
+          { label: '📦 Ajouter le Pack Dot & Mariage (liste détaillée)', actionId: `apply_pack_cart_${guests}`, icon: '📦' },
+          { label: '📋 Ajouter chaque boisson en lignes séparées', actionId: `apply_individual_${guests}`, icon: '📋' },
+          { label: '📲 Exporter l’estimation sur WhatsApp', actionId: `export_estimation_wa_${guests}`, icon: '📲' },
         ],
         undefined,
-        {
-          guests,
-          eventType: 'Cérémonie & Fête',
-          cratesBeer,
-          cratesSofts,
-          packsWater,
-          wineBottles,
-          iceBags,
-          estimatedCost,
-        }
+        estimation
+      );
+      return;
+    }
+
+    if (actionId.startsWith('apply_pack_cart_')) {
+      const guests = parseInt(actionId.replace('apply_pack_cart_', ''), 10);
+      const estimation = computeEventBreakdown(guests, 'Dot & Mariage');
+      const packProd = DEFAULT_PRODUCTS.find((p) => p.id === 'prod-pack-dot-mariage') || DEFAULT_PRODUCTS[0];
+
+      addToCart(packProd, 1, {
+        packBreakdown: estimation.breakdown,
+        eventGuests: guests,
+        eventType: 'Dot & Mariage',
+        customTitle: `Pack Cérémonie Dot & Mariage (${guests} convives — Proposition Chatbot)`,
+        priceModifier: estimation.estimatedCost - packProd.price,
+      });
+
+      toast(`Pack Dot & Mariage (${guests} convives) ajouté avec sa liste détaillée dans votre panier !`, 'success');
+
+      addAssistantResponse(
+        `✅ Le **Pack Cérémonie Dot & Mariage (${guests} convives)** est maintenant exactement listé dans votre panier avec la composition détaillée de la proposition :\n\n` +
+        `• 🍺 **${estimation.cratesBeer} Casiers** La Béninoise 65cl\n` +
+        `• 🥤 **${estimation.cratesSofts} Casiers** Youki Cocktail & Pamplemousse\n` +
+        `• 💧 **${estimation.packsWater} Packs** Eau Minérale Possotomé 1.5L\n` +
+        `• 🍾 **${estimation.wineBottles} Bouteilles** Vin Supérieur Baron de Lestac\n` +
+        `• 🧊 **${estimation.iceBags} Sacs de Glaçons 5kg** (Offerts)\n\n` +
+        `Consultez dès à présent votre panier pour vérifier le récapitulatif !`,
+        [
+          { label: '🛒 Voir mon Panier', actionId: 'go_to_cart', icon: '🛒' },
+          { label: '💳 Passer au Paiement (MoMo / Cash)', actionId: 'go_to_checkout', icon: '💳' },
+        ]
+      );
+      return;
+    }
+
+    if (actionId.startsWith('apply_individual_')) {
+      const guests = parseInt(actionId.replace('apply_individual_', ''), 10);
+      const estimation = computeEventBreakdown(guests, 'Dot & Mariage');
+
+      const pBeer = DEFAULT_PRODUCTS.find((p) => p.id === 'prod-beninoise-65') || DEFAULT_PRODUCTS[0];
+      const pSoft = DEFAULT_PRODUCTS.find((p) => p.id === 'prod-youki-cocktail') || DEFAULT_PRODUCTS[3];
+      const pWater = DEFAULT_PRODUCTS.find((p) => p.id === 'prod-eau-possotome-15') || DEFAULT_PRODUCTS[5];
+      const pWine = DEFAULT_PRODUCTS.find((p) => p.id === 'prod-baron-lestac') || DEFAULT_PRODUCTS[4];
+      const pIce = DEFAULT_PRODUCTS.find((p) => p.id === 'prod-glacons-5kg');
+
+      addToCart(pBeer, estimation.cratesBeer, { optionLabel: `Proposition Événement (${guests} convives)` });
+      addToCart(pSoft, estimation.cratesSofts, { optionLabel: `Proposition Événement (${guests} convives)` });
+      addToCart(pWater, estimation.packsWater, { optionLabel: `Proposition Événement (${guests} convives)` });
+      addToCart(pWine, estimation.wineBottles, { optionLabel: `Proposition Événement (${guests} convives)` });
+      if (pIce) {
+        addToCart(pIce, estimation.iceBags, {
+          optionLabel: `Glaçons Offerts (${guests} convives)`,
+          priceModifier: -pIce.price,
+        });
+      }
+
+      toast(`Les boissons de la proposition (${guests} convives) ont été listées dans votre panier !`, 'success');
+
+      addAssistantResponse(
+        `✅ Toutes les boissons de la proposition ont été exactement listées en articles individuels dans votre panier :\n\n` +
+        `• 🍺 **${estimation.cratesBeer} ×** Casiers de La Béninoise 65cl\n` +
+        `• 🥤 **${estimation.cratesSofts} ×** Casiers de Youki Cocktail\n` +
+        `• 💧 **${estimation.packsWater} ×** Packs d'Eau Minérale Possotomé 1.5L\n` +
+        `• 🍾 **${estimation.wineBottles} ×** Bouteilles de Vin Baron de Lestac\n` +
+        `• 🧊 **${estimation.iceBags} ×** Sacs de Glaçons Purifiés 5kg (OFFERT)\n\n` +
+        `Vous pouvez modifier les quantités ou valider votre commande.`,
+        [
+          { label: '🛒 Voir mon Panier', actionId: 'go_to_cart', icon: '🛒' },
+          { label: '💳 Passer au Paiement', actionId: 'go_to_checkout', icon: '💳' },
+        ]
       );
       return;
     }
 
     if (actionId === 'apply_pack_cart') {
+      const estimation = computeEventBreakdown(100, 'Dot & Mariage');
       const packProd = DEFAULT_PRODUCTS.find((p) => p.id === 'prod-pack-dot-mariage') || DEFAULT_PRODUCTS[0];
-      addToCart(packProd, 1);
-      toast('Pack Cérémonie configuré et ajouté à votre panier !', 'success');
+      addToCart(packProd, 1, {
+        packBreakdown: estimation.breakdown,
+        eventGuests: 100,
+        eventType: 'Dot & Mariage',
+        customTitle: 'Pack Cérémonie Dot & Mariage (100 convives — Proposition Chatbot)',
+      });
+      toast('Pack Cérémonie configuré et listé dans votre panier !', 'success');
 
       addAssistantResponse(
-        `✅ Le Pack Cérémonie a été déposé dans votre panier ! Vous pouvez finaliser la commande dès maintenant. Besoin de verres ou d'un camion frigorifique ?`,
+        `✅ Le Pack Cérémonie Dot & Mariage a été déposé dans votre panier avec la liste exacte des boissons !`,
         [
           { label: 'Voir mon panier', actionId: 'go_to_cart', icon: '🛒' },
           { label: 'Finaliser avec MTN MoMo / Cash', actionId: 'go_to_checkout', icon: '💳' },
@@ -389,9 +517,18 @@ export function SmartBreweryAssistant({ isAdmin, setView }: SmartBreweryAssistan
       window.open(`https://wa.me/${waNumber}?text=Bonjour,%20je%20vous%20contacte%20suite%20aux%20conseils%20de%20l'Assistant%20SAFFO`, '_blank');
       return;
     }
-    if (actionId === 'export_estimation_wa') {
+    if (actionId.startsWith('export_estimation_wa')) {
       const waNumber = '+22997204060';
-      window.open(`https://wa.me/${waNumber}?text=Bonjour,%20voici%20l'estimation%20de%20boissons%20calculee%20par%20l'Assistant%20SAFFO%20pour%20mon%20evenement.`, '_blank');
+      const guests = parseInt(actionId.replace('export_estimation_wa_', ''), 10) || 100;
+      const est = computeEventBreakdown(guests, 'Dot & Mariage');
+      const text = `Bonjour SAFFO ONLINE ! Voici l'estimation calculée par le Chatbot pour mon événement (${guests} invités) :\n` +
+        `• ${est.cratesBeer} Casiers de Béninoise 65cl\n` +
+        `• ${est.cratesSofts} Casiers de Youki Cocktail\n` +
+        `• ${est.packsWater} Packs d'Eau Possotomé 1.5L\n` +
+        `• ${est.wineBottles} Bouteilles de Vin Baron de Lestac\n` +
+        `• ${est.iceBags} Sacs de Glaçons 5kg (Offerts)\n` +
+        `Budget estimé : ${formatPrice(est.estimatedCost)}. Pouvez-vous me confirmer la disponibilité ?`;
+      window.open(`https://wa.me/${waNumber}?text=${encodeURIComponent(text)}`, '_blank');
       return;
     }
   }
@@ -412,10 +549,36 @@ export function SmartBreweryAssistant({ isAdmin, setView }: SmartBreweryAssistan
     const q = query.toLowerCase();
 
     // Natural Language Logic
-    if (q.includes('mariage') || q.includes('dot') || q.includes('fête') || q.includes('invit')) {
+    const guestMatch = q.match(/(\d{2,4})\s*(personnes?|invit[ée]s?|convives?|invites?|gens)?/);
+    if (guestMatch) {
+      const customGuests = parseInt(guestMatch[1], 10);
+      if (customGuests >= 15 && customGuests <= 3000) {
+        const est = computeEventBreakdown(customGuests, q.includes('dot') ? 'Dot traditionnelle' : q.includes('mariage') ? 'Grand Mariage' : 'Cérémonie & Fête');
+        addAssistantResponse(
+          `Voici mon calcul optimisé et la proposition exacte de boissons pour ${customGuests} convives (${est.eventType}) :\n\n` +
+          `• 🍺 **${est.cratesBeer} Casiers** de La Béninoise 65cl (${est.cratesBeer * 24} bouteilles)\n` +
+          `• 🥤 **${est.cratesSofts} Casiers** de Youki Cocktail & Pamplemousse (${est.cratesSofts * 24} bouteilles)\n` +
+          `• 💧 **${est.packsWater} Packs** d'Eau Minérale Possotomé 1.5L (${est.packsWater * 6} bouteilles)\n` +
+          `• 🍾 **${est.wineBottles} Bouteilles** de Vin Baron de Lestac / Supérieur\n` +
+          `• 🧊 **${est.iceBags} Sacs de Glaçons Purifiés 5kg (OFFERT par SAFFO)**\n\n` +
+          `Comment souhaitez-vous ajouter cette proposition dans votre panier ?`,
+          [
+            { label: '📦 Ajouter le Pack Dot & Mariage (liste détaillée)', actionId: `apply_pack_cart_${customGuests}`, icon: '📦' },
+            { label: '📋 Ajouter chaque boisson en articles séparés', actionId: `apply_individual_${customGuests}`, icon: '📋' },
+            { label: '📲 Exporter l’estimation sur WhatsApp', actionId: `export_estimation_wa_${customGuests}`, icon: '📲' },
+          ],
+          undefined,
+          est
+        );
+        return;
+      }
+    }
+
+    if (q.includes('mariage') || q.includes('dot') || q.includes('fête') || q.includes('cérémonie') || q.includes('ceremonie')) {
       addAssistantResponse(
         `Pour un événement réussi au Bénin, nous avons des packs tout-inclus et un calculateur dédié. Combien d'invités comptez-vous recevoir ?`,
         [
+          { label: '👥 50 invités (Fête de famille)', actionId: 'calc_guests_50', icon: '👥' },
           { label: '🎉 100 invités (Dot standard)', actionId: 'calc_guests_100', icon: '🎉' },
           { label: '👑 200 invités (Grand Mariage)', actionId: 'calc_guests_200', icon: '👑' },
         ]
@@ -565,24 +728,64 @@ export function SmartBreweryAssistant({ isAdmin, setView }: SmartBreweryAssistan
 
                 {/* Event Estimation Card if present */}
                 {m.eventEstimation && (
-                  <div className="w-full mt-2 bg-white rounded-xl border border-gray-200 p-3 text-xs shadow-sm space-y-2">
-                    <p className="font-extrabold text-[#D10024] uppercase text-[11px] border-b pb-1">
-                      Estimation Événementiel ({m.eventEstimation.guests} personnes)
-                    </p>
-                    <div className="grid grid-cols-2 gap-2 text-[11px]">
-                      <div>🍺 <strong>{m.eventEstimation.cratesBeer} Casiers</strong> de Bières</div>
-                      <div>🥤 <strong>{m.eventEstimation.cratesSofts} Casiers</strong> de Youki</div>
-                      <div>💧 <strong>{m.eventEstimation.packsWater} Packs</strong> Possotomé</div>
-                      <div>🍾 <strong>{m.eventEstimation.wineBottles} Bouteilles</strong> de Vin</div>
-                      <div className="col-span-2 text-green-700 font-bold">
-                        🧊 {m.eventEstimation.iceBags} Sacs de Glaçons 5kg offerts
+                  <div className="w-full mt-2 bg-white rounded-xl border border-red-200 p-3 text-xs shadow-md space-y-2.5">
+                    <div className="flex items-center justify-between border-b pb-1.5 border-gray-100">
+                      <p className="font-extrabold text-[#D10024] uppercase text-[11px] tracking-wide flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-[#FFB300]" />
+                        <span>Proposition {m.eventEstimation.eventType} ({m.eventEstimation.guests} convives)</span>
+                      </p>
+                      <span className="text-[9px] bg-red-100 text-[#D10024] font-bold px-1.5 py-0.5 rounded">
+                        Brasserie SAFFO
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5 bg-gray-50 p-2.5 rounded-lg border border-gray-100 text-[11px]">
+                      {m.eventEstimation.breakdown.map((item, idx) => (
+                        <div key={idx} className="flex items-start justify-between gap-1 text-gray-800">
+                          <span className="flex items-center gap-1.5 font-medium">
+                            <span>{item.icon}</span>
+                            <span className="font-bold text-gray-900">{item.quantity} ×</span>
+                            <span>{item.name}</span>
+                          </span>
+                          <span className="text-gray-500 text-[10px] whitespace-nowrap">
+                            {item.note ? (
+                              <strong className="text-green-700 bg-green-50 px-1 py-0.2 rounded border border-green-200">
+                                {item.note}
+                              </strong>
+                            ) : (
+                              item.unit
+                            )}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1 border-t border-gray-100">
+                      <div>
+                        <span className="text-[10px] text-gray-500 block">Budget estimé boissons :</span>
+                        <span className="font-black text-[#D10024] text-sm">
+                          {formatPrice(m.eventEstimation.estimatedCost)}
+                        </span>
+                      </div>
+                      <div className="text-right text-[10px] text-gray-500">
+                        <span>Livraison glacée sous 2h</span>
                       </div>
                     </div>
-                    <div className="pt-1.5 border-t text-right">
-                      <span className="text-[10px] text-gray-500">Budget estimé : </span>
-                      <span className="font-black text-[#D10024] text-sm">
-                        {formatPrice(m.eventEstimation.estimatedCost)}
-                      </span>
+
+                    {/* Quick Add Buttons on Card */}
+                    <div className="pt-1 flex flex-col gap-1.5">
+                      <button
+                        onClick={() => handleActionClick(`apply_pack_cart_${m.eventEstimation!.guests}`)}
+                        className="w-full bg-[#D10024] hover:bg-[#A8001D] text-white py-2 px-3 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm active:scale-98"
+                      >
+                        <span>📦 Ajouter le Pack Dot & Mariage au panier</span>
+                      </button>
+                      <button
+                        onClick={() => handleActionClick(`apply_individual_${m.eventEstimation!.guests}`)}
+                        className="w-full bg-gray-100 hover:bg-gray-200 text-gray-800 py-1.5 px-3 rounded-lg text-[11px] font-semibold transition flex items-center justify-center gap-1 active:scale-98"
+                      >
+                        <span>📋 Ajouter chaque boisson en lignes séparées</span>
+                      </button>
                     </div>
                   </div>
                 )}

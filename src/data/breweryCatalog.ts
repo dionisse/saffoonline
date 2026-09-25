@@ -1,4 +1,4 @@
-import type { Banner, Category, Product, Promotion, Publication } from '../lib/database.types';
+import type { Banner, Category, Product, Promotion, Publication, PackBreakdownItem } from '../lib/database.types';
 
 export interface Testimonial {
   id: string;
@@ -684,3 +684,29 @@ export const DEFAULT_TESTIMONIALS: Testimonial[] = [
     date: 'Juillet 2026',
   },
 ];
+
+export const DEFAULT_PACK_BREAKDOWNS: Record<string, PackBreakdownItem[]> = {
+  'prod-pack-dot-mariage': [
+    { icon: '🍺', name: 'La Béninoise 65cl (Bouteilles verre consignées)', quantity: 10, unit: 'Casiers (240 btles)' },
+    { icon: '🍺', name: 'Beaufort Lager 50cl (Bouteilles verre consignées)', quantity: 5, unit: 'Casiers (120 btles)' },
+    { icon: '🥤', name: 'Youki Cocktail & Pamplemousse 50cl', quantity: 4, unit: 'Casiers (96 btles)' },
+    { icon: '💧', name: 'Eau Minérale Naturelle Possotomé 1.5L', quantity: 4, unit: 'Packs de 6 (24 btles)' },
+    { icon: '🍾', name: 'Baron de Lestac — Bordeaux Supérieur 75cl', quantity: 12, unit: 'Bouteilles (2 cartons)' },
+    { icon: '🧊', name: 'Sacs de Glaçons Alimentaires Purifiés 5kg', quantity: 4, unit: 'Sacs de 5kg', note: 'Offerts par SAFFO' },
+  ],
+  'prod-pack-maquis-reassort': [
+    { icon: '🍺', name: 'La Béninoise 65cl (Casier de 24)', quantity: 15, unit: 'Casiers (360 btles)' },
+    { icon: '🍺', name: 'Castel Beer 65cl (Casier de 24)', quantity: 5, unit: 'Casiers (120 btles)' },
+    { icon: '🍺', name: 'Doppel Munich 50cl (Casier de 24)', quantity: 5, unit: 'Casiers (120 btles)' },
+    { icon: '🥤', name: 'Youki Cocktail 50cl (Casier de 24)', quantity: 5, unit: 'Casiers (120 btles)' },
+    { icon: '🧊', name: 'Sacs de Glaçons Purifiés 5kg', quantity: 3, unit: 'Sacs de 5kg', note: 'Offerts' },
+  ],
+  'prod-pack-anniversaire': [
+    { icon: '🍺', name: 'La Béninoise 33cl (Casier de 24)', quantity: 5, unit: 'Casiers (120 btles)' },
+    { icon: '🍺', name: 'Chill Citron 33cl (Casier de 24)', quantity: 2, unit: 'Casiers (48 btles)' },
+    { icon: '🥤', name: 'Youki Pamplemousse 50cl (Casier de 24)', quantity: 2, unit: 'Casiers (48 btles)' },
+    { icon: '💧', name: 'Eau Minérale Possotomé 1.5L', quantity: 2, unit: 'Packs de 6' },
+    { icon: '🍾', name: 'Vin Mousseux Freixenet Cava 75cl', quantity: 6, unit: 'Bouteilles (1 carton)' },
+    { icon: '🧊', name: 'Sacs de Glaçons Purifiés 5kg', quantity: 2, unit: 'Sacs de 5kg', note: 'Offerts' },
+  ],
+};

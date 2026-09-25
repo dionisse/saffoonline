@@ -401,8 +401,13 @@ export function AppShell({ view, setView, children }: { view: View; setView: (v:
                                     />
                                     <div className="flex-1 min-w-0">
                                       <p className="text-xs font-semibold text-gray-900 truncate">
-                                        {it.product.name}
+                                        {it.customTitle ?? it.product.name}
                                       </p>
+                                      {it.packBreakdown && it.packBreakdown.length > 0 && (
+                                        <p className="text-[10px] text-[#D10024] font-medium truncate mt-0.5">
+                                          📦 Pack : {it.packBreakdown.map(b => `${b.quantity} ${b.name.split(' ')[0]}`).join(', ')}
+                                        </p>
+                                      )}
                                       {it.optionLabel && (
                                         <p className="text-[10px] text-gray-500 truncate">{it.optionLabel}</p>
                                       )}

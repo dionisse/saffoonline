@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import {
   ArrowLeft, Loader2, Package2, Tag, Plus, Minus, ShoppingCart,
-  MessageCircle, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight,
+  MessageCircle, AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Sparkles,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { formatPrice, parseImages } from '../lib/format';
@@ -9,7 +9,7 @@ import type { Product, ProductOptionGroup, ProductOption } from '../lib/database
 import { useCart, getEffectivePrice } from '../contexts/CartContext';
 import { LazyImage, useRipple, useToast } from '../components/ui';
 import type { View } from '../lib/views';
-import { DEFAULT_PRODUCTS } from '../data/breweryCatalog';
+import { DEFAULT_PRODUCTS, DEFAULT_PACK_BREAKDOWNS } from '../data/breweryCatalog';
 
 // ─── Image gallery ────────────────────────────────────────────────────────────
 
@@ -333,6 +333,32 @@ export function ProductPage({ id, setView }: { id: string; setView: (v: View) =>
             <div className="mb-5">
               <h2 className="text-sm font-semibold mb-1.5">Description</h2>
               <p className="text-sm text-brand-muted leading-relaxed">{product.description}</p>
+            </div>
+          )}
+
+          {/* Detailed Pack Composition for Dot, Mariage & Events */}
+          {DEFAULT_PACK_BREAKDOWNS[product.id] && (
+            <div className="mb-5 bg-red-50/60 border border-red-200 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2.5 pb-2 border-b border-red-200 text-[#D10024] font-black uppercase text-xs tracking-wider">
+                <Sparkles className="w-4 h-4 text-[#FFB300]" />
+                <span>Composition détaillée incluse dans ce pack Dot & Mariage / Événement :</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                {DEFAULT_PACK_BREAKDOWNS[product.id].map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-2 bg-white p-2.5 rounded-lg border border-red-100 shadow-2xs">
+                    <span className="text-base select-none">{item.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-gray-900 leading-tight">
+                        <span className="text-[#D10024] font-black">{item.quantity} ×</span> {item.name}
+                      </p>
+                      <p className="text-[10px] text-gray-500 mt-0.5">{item.unit}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="mt-2 text-[10px] text-gray-500 italic">
+                * Bouteilles livrées glacées prêtes pour le service. Reprise des casiers vides 1 pour 1 à la livraison.
+              </p>
             </div>
           )}
 

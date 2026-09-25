@@ -294,11 +294,11 @@ export function CheckoutPage({ setView }: { setView: (v: View) => void }) {
 
     // ── Step 2: Order items ───────────────────────────────────────────────────
     const orderItems = items.map((it) => {
-      const unit = getEffectivePrice(it.product, it.quantity);
+      const unit = getEffectivePrice(it.product, it.quantity, it.priceModifier ?? 0);
       return {
         order_id: (order as { id: string }).id,
         product_id: it.product.id,
-        product_name: it.product.name,
+        product_name: it.customTitle ?? it.product.name,
         quantity: it.quantity,
         unit_price: unit,
         subtotal: unit * it.quantity,
@@ -637,13 +637,34 @@ export function CheckoutPage({ setView }: { setView: (v: View) => void }) {
         <div className="lg:sticky lg:top-20 h-fit">
           <div className="card p-5">
             <h2 className="font-semibold mb-4">Récapitulatif</h2>
-            <div className="space-y-2 text-sm max-h-60 overflow-auto pb-3 border-b border-brand-border">
+            <div className="space-y-3 text-sm max-h-72 overflow-auto pb-3 border-b border-brand-border">
               {items.map((it) => {
-                const price = getEffectivePrice(it.product, it.quantity);
+                const key = it.cartKey ?? it.product.id;
+                const price = getEffectivePrice(it.product, it.quantity, it.priceModifier ?? 0);
                 return (
-                  <div key={it.product.id} className="flex justify-between gap-2">
-                    <span className="line-clamp-1 text-brand-muted">{it.quantity} × {it.product.name}</span>
-                    <span className="font-medium flex-shrink-0">{formatPrice(price * it.quantity)}</span>
+                  <div key={key} className="space-y-1">
+                    <div className="flex justify-between gap-2">
+                      <span className="line-clamp-2 text-gray-900 font-medium text-xs">
+                        {it.quantity} × {it.customTitle ?? it.product.name}
+                      </span>
+                      <span className="font-bold text-xs flex-shrink-0 text-brand-primary">
+                        {formatPrice(price * it.quantity)}
+                      </span>
+                    </div>
+
+                    {it.packBreakdown && it.packBreakdown.length > 0 && (
+                      <div className="pl-2 border-l-2 border-[#D10024] bg-red-50/50 rounded-r p-1.5 text-[10px] space-y-0.5">
+                        <p className="font-bold text-[#D10024] text-[9px] uppercase tracking-wider">
+                          Détail Pack ({it.eventType || 'Dot & Mariage'}) :
+                        </p>
+                        {it.packBreakdown.map((b, idx) => (
+                          <div key={idx} className="flex justify-between text-gray-700">
+                            <span>{b.icon} {b.quantity * it.quantity} × {b.name}</span>
+                            <span className="text-gray-400 text-[9px] ml-1">{b.unit}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })}

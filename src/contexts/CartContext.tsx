@@ -1,10 +1,16 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import type { CartItem, Product } from '../lib/database.types';
+import type { CartItem, Product, PackBreakdownItem } from '../lib/database.types';
+import { DEFAULT_PACK_BREAKDOWNS } from '../data/breweryCatalog';
 
-interface AddToCartOptions {
+export interface AddToCartOptions {
   optionLabel?: string;
   priceModifier?: number;
   optionStock?: number;
+  packBreakdown?: PackBreakdownItem[];
+  eventGuests?: number;
+  eventType?: string;
+  customTitle?: string;
+  customCartKey?: string;
 }
 
 interface CartContextValue {
@@ -36,15 +42,29 @@ export function CartProvider({ children }: { children: ReactNode }) {
   useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); }, [items]);
 
   function addToCart(product: Product, quantity = 1, options?: AddToCartOptions) {
-    const key = options?.optionLabel ? `${product.id}__${options.optionLabel}` : product.id;
+    const key = options?.customCartKey
+      ?? (options?.optionLabel
+        ? `${product.id}__${options.optionLabel}`
+        : options?.eventGuests
+          ? `${product.id}__${options.eventGuests}_invites`
+          : product.id);
+
     const untracked = !product.track_stock;
     const maxQty = untracked ? 9999 : (options?.optionStock !== undefined ? options.optionStock : product.stock);
+    const resolvedBreakdown = options?.packBreakdown ?? DEFAULT_PACK_BREAKDOWNS[product.id];
 
     setItems((prev) => {
       const existing = prev.find((it) => (it.cartKey ?? it.product.id) === key);
       if (existing) {
         return prev.map((it) => (it.cartKey ?? it.product.id) === key
-          ? { ...it, quantity: Math.min(it.quantity + quantity, maxQty) }
+          ? {
+              ...it,
+              quantity: Math.min(it.quantity + quantity, maxQty),
+              packBreakdown: resolvedBreakdown ?? it.packBreakdown,
+              customTitle: options?.customTitle ?? it.customTitle,
+              eventGuests: options?.eventGuests ?? it.eventGuests,
+              eventType: options?.eventType ?? it.eventType,
+            }
           : it);
       }
       return [...prev, {
@@ -54,6 +74,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
         optionLabel: options?.optionLabel,
         priceModifier: options?.priceModifier,
         optionStock: options?.optionStock,
+        packBreakdown: resolvedBreakdown,
+        customTitle: options?.customTitle,
+        eventGuests: options?.eventGuests,
+        eventType: options?.eventType,
       }];
     });
   }
