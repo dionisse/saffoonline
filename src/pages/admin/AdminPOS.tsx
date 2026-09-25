@@ -85,11 +85,11 @@ export function AdminPOS() {
       list = list.filter((p) => p.category_id === activeSubcategory);
     } else if (activeCategory) {
       const childIds = allCategories.filter((c) => c.parent_id === activeCategory).map((c) => c.id);
-      list = list.filter((p) => p.category_id === activeCategory || childIds.includes(p.category_id));
+      list = list.filter((p) => p.category_id === activeCategory || (p.category_id ? childIds.includes(p.category_id) : false));
     }
     if (search) {
       const q = search.toLowerCase();
-      list = list.filter((p) => p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q));
+      list = list.filter((p) => p.name.toLowerCase().includes(q) || (p.sku ? p.sku.toLowerCase().includes(q) : false));
     }
     return list;
   }, [products, allCategories, activeCategory, activeSubcategory, search]);
@@ -212,7 +212,7 @@ export function AdminPOS() {
               </button>
               {categories.map((cat) => {
                 const childIds = allCategories.filter((c) => c.parent_id === cat.id).map((c) => c.id);
-                const count = products.filter((p) => p.category_id === cat.id || childIds.includes(p.category_id)).length;
+                const count = products.filter((p) => p.category_id === cat.id || (p.category_id ? childIds.includes(p.category_id) : false)).length;
                 return (
                   <button key={cat.id} onClick={() => { setActiveCategory(cat.id); setActiveSubcategory(null); }}
                     className={`flex-shrink-0 px-3 py-1 rounded text-xs font-medium border transition ${activeCategory === cat.id ? 'bg-brand-primary border-brand-primary text-white' : 'bg-white border-brand-border'}`}>

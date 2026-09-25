@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   ShoppingBasket, Plus, Loader2, X, CheckCircle, XCircle,
-  Eye, Trash2, RefreshCw, FileText, Upload, ExternalLink,
+  Trash2, RefreshCw, FileText, Upload, ExternalLink,
   ChevronDown, ChevronUp, AlertTriangle, Search,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -177,7 +177,7 @@ export function AdminPurchases() {
   }
 
   // ── Cancel purchase ───────────────────────────────────────────────────────
-  async function cancelPurchase(id: string, currentStatus: string) {
+  async function cancelPurchase(id: string, _currentStatus?: string) {
     if (!confirm('Confirmer l\'annulation ? Le stock sera reversé si l\'approvisionnement était validé.')) return;
     setActionLoading(id + '-cancel');
     await supabase.from('purchases').update({ status: 'cancelled', updated_at: new Date().toISOString() }).eq('id', id);

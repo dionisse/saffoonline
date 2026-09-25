@@ -1,7 +1,7 @@
-import { ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useState } from 'react';
 import {
   Loader2, Plus, Search, Edit2, Trash2, Package2, X, AlertTriangle,
-  Tag, Layers, ChevronDown, ChevronUp, RefreshCw, TableProperties,
+  Tag, Layers, RefreshCw, TableProperties,
   List, Check, Download, Upload, GripVertical, Sparkles, CheckCircle2,
   Cloud, AlertCircle,
 } from 'lucide-react';
@@ -133,7 +133,7 @@ export function AdminProducts() {
     if (filterBrand && p.brand_id !== filterBrand) return false;
     if (filterCat) {
       const childIds = categories.filter((c) => c.parent_id === filterCat).map((c) => c.id);
-      if (p.category_id !== filterCat && !childIds.includes(p.category_id)) return false;
+      if (p.category_id !== filterCat && !(p.category_id && childIds.includes(p.category_id))) return false;
     }
     if (search) {
       const q = search.toLowerCase();
@@ -886,6 +886,7 @@ function BulkEditor({ products, categories, brands, onSaved }: {
       bulk_quantity: String(p.bulk_quantity),
       bulk_price: String(p.bulk_price),
       is_active: p.is_active,
+      track_stock: p.track_stock,
       _dirty: false,
     })),
   [products, brands, categories]);

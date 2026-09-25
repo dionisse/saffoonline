@@ -2,12 +2,17 @@ import { useState, ReactNode, useEffect, useRef } from 'react';
 import {
   Store, ShoppingCart, Package, Menu, User, LogOut, LayoutDashboard,
   ScanBarcode, Boxes, ListOrdered, X, BarChart3, Settings, Warehouse,
-  ShoppingBasket, CreditCard, ShieldCheck, Phone, MessageCircle, ExternalLink,
-  Scale, FileText, Megaphone, TicketPercent, Radio,
+  ShoppingBasket, CreditCard, ShieldCheck, Phone,
+  Megaphone, TicketPercent, Radio, Search,
+  Heart, MapPin, Mail, ChevronDown, CheckCircle2,
+  Trash2,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { useCart } from '../contexts/CartContext';
+import { useCart, getEffectivePrice } from '../contexts/CartContext';
+import { useWishlist } from '../contexts/WishlistContext';
 import { useStoreSettings } from '../contexts/StoreSettingsContext';
+import { formatPrice } from '../lib/format';
+import { DEFAULT_CATEGORIES } from '../data/breweryCatalog';
 import type { View } from '../lib/views';
 
 // ─── Social icon SVGs ────────────────────────────────────────────────────────
@@ -40,27 +45,37 @@ function IconWhatsapp({ className }: { className?: string }) {
 
 export function AppShell({ view, setView, children }: { view: View; setView: (v: View) => void; children: ReactNode }) {
   const { profile, user, signOut, canAccess } = useAuth();
-  const { itemCount } = useCart();
+  const { items, itemCount, subtotal, removeFromCart } = useCart();
+  const { wishlistCount } = useWishlist();
   const { settings } = useStoreSettings();
+
   const [mobileOpen, setMobileOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
-  const prevCount = useRef(itemCount);
-  const [badgeAnim, setBadgeAnim] = useState(false);
+  const [cartPreviewOpen, setCartPreviewOpen] = useState(false);
+  const [categoriesMenuOpen, setCategoriesMenuOpen] = useState(false);
+  const [headerSearch, setHeaderSearch] = useState('');
+  const [headerCategory, setHeaderCategory] = useState('');
 
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
+  const cartDropdownRef = useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+  const categoriesMenuRef = useRef<HTMLDivElement>(null);
 
+  // Close menus on outside click
   useEffect(() => {
-    if (itemCount > prevCount.current) {
-      setBadgeAnim(true);
-      setTimeout(() => setBadgeAnim(false), 500);
+    function handleClickOutside(event: MouseEvent) {
+      if (cartDropdownRef.current && !cartDropdownRef.current.contains(event.target as Node)) {
+        setCartPreviewOpen(false);
+      }
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setUserMenuOpen(false);
+      }
+      if (categoriesMenuRef.current && !categoriesMenuRef.current.contains(event.target as Node)) {
+        setCategoriesMenuOpen(false);
+      }
     }
-    prevCount.current = itemCount;
-  }, [itemCount]);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const isStaff = profile?.role === 'admin' || profile?.role === 'cashier' || profile?.role === 'employee';
   const isAdminView = view.kind.startsWith('admin-');
@@ -83,180 +98,610 @@ export function AppShell({ view, setView, children }: { view: View; setView: (v:
   ];
 
   const adminNav = ALL_ADMIN_NAV.filter((item) => canAccess(item.kind));
-  const storeName = settings.store_name || 'BrasseriePro';
+  const storeName = settings.store_name || 'SAFFO ONLINE';
+  const phoneNumber = settings.phone_number || '+229 97 20 40 60';
+  const whatsappNumber = settings.whatsapp_number || '+229 97 20 40 60';
+  const cleanPhone = phoneNumber.replace(/\s+/g, '');
+  const cleanWhatsapp = whatsappNumber.replace(/\D/g, '');
   const year = new Date().getFullYear();
 
-  return (
-    <div className="min-h-screen bg-white flex flex-col">
+  function handleSearchSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setView({
+      kind: 'shop',
+      search: headerSearch.trim() || undefined,
+      categoryId: headerCategory || undefined,
+    });
+  }
 
-      {/* ── Announcement bar (shop only) ──────────────────────────────────── */}
+  function handleCategoryNav(catId: string) {
+    setCategoriesMenuOpen(false);
+    setMobileOpen(false);
+    setView({ kind: 'shop', categoryId: catId });
+  }
+
+  const navCategories = [
+    { id: 'cat-bieres', label: 'Bières & Casiers' },
+    { id: 'cat-vins-champagnes', label: 'Vins & Champagnes' },
+    { id: 'cat-spiritueux', label: 'Spiritueux' },
+    { id: 'cat-softs-jus', label: 'Softs & Jus' },
+    { id: 'cat-eaux-glace', label: 'Eaux & Glaçons' },
+    { id: 'cat-packs-ceremonies', label: 'Packs Cérémonies' },
+  ];
+
+  return (
+    <div className="min-h-screen bg-[#F8F9FA] text-[#2B2D42] flex flex-col font-sans">
+
+      {/* ── 1. ELECTRO TOP BAR (Dark #1E1F29) ──────────────────────────────── */}
       {!isAdminView && (
-        <div className="bg-brand-dark text-white text-xs py-2 text-center font-medium tracking-wide">
-          {settings.phone_number
-            ? `Commandez par téléphone : ${settings.phone_number} · Livraison dans tout le Bénin`
-            : 'Livraison rapide à Cotonou & partout au Bénin · Paiement Mobile Money accepté'}
+        <div className="bg-[#1E1F29] text-[#B9BABC] text-xs border-b border-white/5 py-2">
+          <div className="max-w-7xl mx-auto px-4 lg:px-6 flex flex-wrap items-center justify-between gap-y-2">
+            
+            {/* Left: Contact Info with red icons */}
+            <div className="flex items-center gap-4 sm:gap-6 flex-wrap">
+              <a href={`tel:${cleanPhone}`} className="flex items-center gap-1.5 hover:text-white transition">
+                <Phone className="w-3.5 h-3.5 text-[#D10024]" />
+                <span className="font-medium">{phoneNumber}</span>
+              </a>
+              <a href="mailto:contact@saffoonline.bj" className="hidden md:flex items-center gap-1.5 hover:text-white transition">
+                <Mail className="w-3.5 h-3.5 text-[#D10024]" />
+                <span>contact@saffoonline.bj</span>
+              </a>
+              <div className="hidden sm:flex items-center gap-1.5 text-white/70">
+                <MapPin className="w-3.5 h-3.5 text-[#D10024]" />
+                <span>Akpakpa & Cotonou, Bénin</span>
+              </div>
+            </div>
+
+            {/* Right: Currency & Account */}
+            <div className="flex items-center gap-4 sm:gap-6">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold text-white/90 bg-white/10 px-2 py-0.5 rounded text-[11px]">
+                  FCFA (XOF)
+                </span>
+                <span className="text-white/80 text-[11px] font-medium hidden sm:inline">
+                  Bénin 🇧🇯
+                </span>
+              </div>
+
+              {user ? (
+                <div className="relative" ref={userMenuRef}>
+                  <button
+                    onClick={() => setUserMenuOpen(!userMenuOpen)}
+                    className="flex items-center gap-1.5 text-white hover:text-[#D10024] transition font-medium"
+                  >
+                    <User className="w-3.5 h-3.5 text-[#D10024]" />
+                    <span>{profile?.full_name?.split(' ')[0] || 'Mon Compte'}</span>
+                    <ChevronDown className="w-3 h-3 text-white/60" />
+                  </button>
+
+                  {userMenuOpen && (
+                    <div className="absolute right-0 top-full mt-2 w-48 bg-white text-gray-800 rounded-lg shadow-xl border border-gray-100 py-1.5 z-50 animate-fade-in-scale">
+                      <div className="px-3 py-1.5 border-b border-gray-100">
+                        <p className="text-xs font-semibold text-gray-900 truncate">{profile?.full_name || 'Utilisateur'}</p>
+                        <p className="text-[11px] text-gray-500 truncate">{user.email}</p>
+                      </div>
+                      <button
+                        onClick={() => { setView({ kind: 'orders' }); setUserMenuOpen(false); }}
+                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 flex items-center gap-2 text-gray-700"
+                      >
+                        <Package className="w-3.5 h-3.5 text-gray-400" />
+                        Mes commandes
+                      </button>
+                      {isStaff && (
+                        <button
+                          onClick={() => { setView({ kind: 'admin-dashboard' }); setUserMenuOpen(false); }}
+                          className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 flex items-center gap-2 text-[#D10024] font-medium"
+                        >
+                          <Settings className="w-3.5 h-3.5" />
+                          Administration
+                        </button>
+                      )}
+                      <div className="border-t border-gray-100 my-1" />
+                      <button
+                        onClick={() => { signOut(); setUserMenuOpen(false); }}
+                        className="w-full text-left px-3 py-1.5 text-xs hover:bg-red-50 text-red-600 flex items-center gap-2"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                        Déconnexion
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <button
+                  onClick={() => setView({ kind: 'auth' })}
+                  className="flex items-center gap-1.5 hover:text-white transition font-medium"
+                >
+                  <User className="w-3.5 h-3.5 text-[#D10024]" />
+                  <span>Mon Compte</span>
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
-      {/* ── Header ────────────────────────────────────────────────────────── */}
-      <header className={`bg-brand-primary text-white sticky top-0 z-40 transition-all duration-300 ${scrolled ? 'shadow-lg shadow-odoo-dark/20' : ''}`}>
+      {/* ── 2. MAIN ELECTRO HEADER (Dark #15161D) ───────────────────────────── */}
+      <header className="bg-[#15161D] text-white border-b border-[#2B2D42] sticky top-0 z-40 transition-all">
         <div className="max-w-7xl mx-auto px-4 lg:px-6">
-          <div className="h-14 flex items-center justify-between gap-4">
-            <button onClick={() => setView({ kind: 'shop' })} className="flex items-center gap-2 font-semibold text-lg hover:opacity-90 transition flex-shrink-0">
-              {settings.logo_url ? (
-                <img src={settings.logo_url} alt={storeName} className="h-8 w-auto object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-              ) : (
-                <Store className="w-6 h-6" />
-              )}
-              <span className="hidden sm:inline">{storeName}</span>
+          <div className="py-4 lg:py-5 flex items-center justify-between gap-4 sm:gap-6">
+            
+            {/* Logo: SAFFO.ONLINE */}
+            <button
+              onClick={() => setView({ kind: 'shop' })}
+              className="flex flex-col items-start hover:opacity-95 transition flex-shrink-0 text-left"
+            >
+              <div className="flex items-baseline gap-1">
+                <span className="text-2xl sm:text-3xl font-black tracking-tight text-white uppercase">
+                  SAFFO
+                </span>
+                <span className="text-[#D10024] text-3xl font-black leading-none">.</span>
+                <span className="text-sm sm:text-base font-extrabold text-[#D10024] tracking-widest uppercase">
+                  ONLINE
+                </span>
+              </div>
+              <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-[#FFB300] -mt-0.5">
+                Dépôt Brasserie & Boissons · Bénin
+              </span>
             </button>
 
+            {/* Admin navigation bar when in admin mode */}
             {isAdminView ? (
-              <nav className="hidden md:flex items-center gap-1 text-sm overflow-x-auto">
+              <nav className="hidden md:flex items-center gap-1 text-xs overflow-x-auto">
                 {adminNav.map((item) => (
-                  <button key={item.kind} onClick={() => setView({ kind: item.kind })}
-                    className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 whitespace-nowrap transition ${view.kind === item.kind ? 'bg-white/20 font-medium' : 'hover:bg-white/10'}`}>
+                  <button
+                    key={item.kind}
+                    onClick={() => setView({ kind: item.kind })}
+                    className={`px-3 py-1.5 rounded-md flex items-center gap-1.5 whitespace-nowrap transition ${
+                      view.kind === item.kind ? 'bg-[#D10024] font-semibold text-white' : 'hover:bg-white/10 text-white/80'
+                    }`}
+                  >
                     {item.icon}{item.label}
                   </button>
                 ))}
               </nav>
             ) : (
-              <nav className="hidden md:flex items-center gap-1 text-sm">
-                <button onClick={() => setView({ kind: 'shop' })} className={`px-3 py-1.5 rounded-md transition ${view.kind === 'shop' ? 'bg-white/20 font-medium' : 'hover:bg-white/10'}`}>Boutique</button>
-                {user && <button onClick={() => setView({ kind: 'orders' })} className={`px-3 py-1.5 rounded-md transition ${view.kind === 'orders' ? 'bg-white/20 font-medium' : 'hover:bg-white/10'}`}>Mes commandes</button>}
-              </nav>
+              /* Electro Centered Integrated Search Bar */
+              <div className="hidden md:flex flex-1 max-w-xl mx-4">
+                <form onSubmit={handleSearchSubmit} className="flex w-full">
+                  <select
+                    value={headerCategory}
+                    onChange={(e) => setHeaderCategory(e.target.value)}
+                    className="bg-white text-gray-800 text-xs font-semibold py-2.5 px-3 rounded-l-full border-r border-gray-200 focus:outline-none cursor-pointer max-w-[170px] truncate"
+                  >
+                    <option value="">Tous les rayons</option>
+                    {DEFAULT_CATEGORIES.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+
+                  <input
+                    type="text"
+                    value={headerSearch}
+                    onChange={(e) => setHeaderSearch(e.target.value)}
+                    placeholder="Rechercher une bière, vin, casier, Possotomé..."
+                    className="flex-1 bg-white text-gray-900 placeholder-gray-400 text-xs px-4 py-2.5 focus:outline-none"
+                  />
+
+                  <button
+                    type="submit"
+                    className="bg-[#D10024] hover:bg-[#A8001D] text-white px-5 py-2.5 rounded-r-full font-bold text-xs uppercase tracking-wider transition-colors flex items-center gap-1.5 flex-shrink-0"
+                  >
+                    <Search className="w-3.5 h-3.5" />
+                    <span className="hidden lg:inline">Chercher</span>
+                  </button>
+                </form>
+              </div>
             )}
 
-            <div className="flex items-center gap-2">
+            {/* Right Action Icons: Wishlist & Cart */}
+            <div className="flex items-center gap-3 sm:gap-5">
               {!isAdminView && (
-                <button onClick={() => setView({ kind: 'cart' })} className="relative p-2 hover:bg-white/10 active:scale-90 rounded-md transition-all duration-150">
-                  <ShoppingCart className="w-5 h-5" />
-                  {itemCount > 0 && (
-                    <span className={`absolute -top-0.5 -right-0.5 bg-odoo-warning text-brand-dark text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center transition-transform ${badgeAnim ? 'animate-badge-bounce' : ''}`}>
-                      {itemCount > 9 ? '9+' : itemCount}
+                <>
+                  {/* WhatsApp Direct Order Button */}
+                  <a
+                    href={`https://wa.me/${cleanWhatsapp}?text=${encodeURIComponent(
+                      'Bonjour Saffo Online, je souhaite passer une commande de boissons au dépôt.'
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hidden xl:inline-flex items-center gap-2 bg-[#25D366]/15 hover:bg-[#25D366]/25 text-[#25D366] border border-[#25D366]/40 px-3 py-1.5 rounded-full text-xs font-bold transition"
+                  >
+                    <IconWhatsapp className="w-4 h-4" />
+                    <span>WhatsApp Express</span>
+                  </a>
+
+                  {/* Wishlist / Favoris Icon */}
+                  <button
+                    onClick={() => setView({ kind: 'shop' })}
+                    title="Vos favoris"
+                    className="flex flex-col items-center group relative text-center"
+                  >
+                    <div className="relative p-1">
+                      <Heart className="w-5 h-5 text-white/90 group-hover:text-[#D10024] transition-colors" />
+                      {wishlistCount > 0 && (
+                        <span className="absolute -top-1 -right-1.5 bg-[#D10024] text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                          {wishlistCount}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-[10px] font-medium text-white/70 group-hover:text-white transition-colors hidden sm:block">
+                      Favoris
                     </span>
-                  )}
-                </button>
+                  </button>
+
+                  {/* Cart Widget with Dropdown Preview */}
+                  <div className="relative" ref={cartDropdownRef}>
+                    <button
+                      onClick={() => setCartPreviewOpen(!cartPreviewOpen)}
+                      className="flex flex-col items-center group relative text-center"
+                    >
+                      <div className="relative p-1">
+                        <ShoppingCart className="w-5 h-5 text-white/90 group-hover:text-[#D10024] transition-colors" />
+                        {itemCount > 0 && (
+                          <span className="absolute -top-1 -right-1.5 bg-[#D10024] text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center animate-badge-bounce">
+                            {itemCount > 9 ? '9+' : itemCount}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] font-medium text-white/70 group-hover:text-white transition-colors hidden sm:block">
+                        Mon Panier
+                      </span>
+                    </button>
+
+                    {/* Cart preview popover */}
+                    {cartPreviewOpen && (
+                      <div className="absolute right-0 top-full mt-3 w-80 sm:w-96 bg-white text-gray-800 rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden animate-fade-in-scale">
+                        <div className="p-3.5 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <ShoppingCart className="w-4 h-4 text-[#D10024]" />
+                            <span className="font-bold text-xs uppercase tracking-wider text-gray-900">
+                              Votre Panier ({itemCount} {itemCount > 1 ? 'articles' : 'article'})
+                            </span>
+                          </div>
+                          <button
+                            onClick={() => setCartPreviewOpen(false)}
+                            className="p-1 text-gray-400 hover:text-gray-700"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        {items.length === 0 ? (
+                          <div className="p-6 text-center">
+                            <p className="text-sm font-medium text-gray-600 mb-1">Votre panier est vide</p>
+                            <p className="text-xs text-gray-400 mb-4">Commandez vos bières, vins et softs au meilleur prix.</p>
+                            <button
+                              onClick={() => { setView({ kind: 'shop' }); setCartPreviewOpen(false); }}
+                              className="btn-electro text-xs w-full"
+                            >
+                              Parcourir le catalogue
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="max-h-60 overflow-y-auto divide-y divide-gray-100 p-2">
+                              {items.map((it) => {
+                                const key = it.cartKey ?? it.product.id;
+                                const itemPrice = getEffectivePrice(it.product, it.quantity, it.priceModifier ?? 0);
+                                return (
+                                  <div key={key} className="py-2.5 px-2 flex items-center gap-3 hover:bg-gray-50 rounded-lg transition">
+                                    <img
+                                      src={it.product.image_url}
+                                      alt={it.product.name}
+                                      className="w-12 h-12 object-cover rounded border border-gray-100 flex-shrink-0"
+                                      onError={(e) => {
+                                        (e.target as HTMLImageElement).src = '/products/beninoise_65.jpg';
+                                      }}
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-xs font-semibold text-gray-900 truncate">
+                                        {it.product.name}
+                                      </p>
+                                      {it.optionLabel && (
+                                        <p className="text-[10px] text-gray-500 truncate">{it.optionLabel}</p>
+                                      )}
+                                      <div className="flex items-center justify-between text-xs mt-0.5">
+                                        <span className="text-gray-500 font-medium">Qté: {it.quantity}</span>
+                                        <span className="font-bold text-[#D10024]">
+                                          {formatPrice(itemPrice * it.quantity)}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <button
+                                      onClick={() => removeFromCart(key)}
+                                      className="p-1 text-gray-400 hover:text-red-600 transition flex-shrink-0"
+                                      title="Supprimer"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            <div className="p-3.5 bg-gray-50 border-t border-gray-200 space-y-3">
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="font-semibold text-gray-700">Sous-total :</span>
+                                <span className="font-extrabold text-[#D10024] text-base">
+                                  {formatPrice(subtotal)}
+                                </span>
+                              </div>
+                              <div className="grid grid-cols-2 gap-2">
+                                <button
+                                  onClick={() => { setView({ kind: 'cart' }); setCartPreviewOpen(false); }}
+                                  className="btn-electro-outline w-full text-[11px] py-2"
+                                >
+                                  Voir Panier
+                                </button>
+                                <button
+                                  onClick={() => { setView({ kind: 'checkout' }); setCartPreviewOpen(false); }}
+                                  className="btn-electro w-full text-[11px] py-2"
+                                >
+                                  Commander
+                                </button>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
 
+              {/* Mode Switch (Admin / Store) */}
               {isAdminView ? (
-                <button onClick={() => setView({ kind: 'shop' })}
-                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white/10 hover:bg-white/20 rounded-md transition">
+                <button
+                  onClick={() => setView({ kind: 'shop' })}
+                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[#D10024] hover:bg-[#A8001D] text-white rounded-md transition"
+                >
                   <Store className="w-3.5 h-3.5" />Boutique
                 </button>
               ) : isStaff ? (
-                <button onClick={() => setView({ kind: 'admin-dashboard' })}
-                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white/10 hover:bg-white/20 rounded-md transition">
-                  <Settings className="w-3.5 h-3.5" />Admin
+                <button
+                  onClick={() => setView({ kind: 'admin-dashboard' })}
+                  className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-white/10 hover:bg-white/20 text-white rounded-md transition"
+                >
+                  <Settings className="w-3.5 h-3.5" />Espace Admin
                 </button>
               ) : null}
 
-              {user ? (
-                <div className="relative">
-                  <button onClick={() => setUserMenuOpen(!userMenuOpen)} className="flex items-center gap-2 p-1.5 hover:bg-white/10 rounded-md transition">
-                    <div className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-xs font-semibold">
-                      {(profile?.full_name || user.email || '?').charAt(0).toUpperCase()}
-                    </div>
-                    <span className="hidden lg:block text-sm max-w-24 truncate">{profile?.full_name || user.email?.split('@')[0]}</span>
-                  </button>
-                  {userMenuOpen && (
-                    <>
-                      <div className="fixed inset-0 z-30" onClick={() => setUserMenuOpen(false)} />
-                      <div className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-brand-border z-40 text-brand-dark overflow-hidden">
-                        <div className="p-3 border-b border-brand-border">
-                          <p className="font-medium text-sm truncate">{profile?.full_name || 'Utilisateur'}</p>
-                          <p className="text-xs text-brand-muted truncate">{user.email}</p>
-                          <span className={`inline-block mt-1.5 badge capitalize ${profile?.role === 'admin' ? 'bg-brand-primary/15 text-odoo-primary' : profile?.role === 'cashier' ? 'bg-odoo-info/15 text-odoo-info' : profile?.role === 'employee' ? 'bg-odoo-success/15 text-odoo-success' : 'bg-odoo-muted/15 text-brand-muted'}`}>
-                            {profile?.role || 'customer'}
-                          </span>
-                        </div>
-                        <button onClick={() => { setView({ kind: 'orders' }); setUserMenuOpen(false); }}
-                          className="w-full text-left px-3 py-2.5 text-sm hover:bg-brand-surface flex items-center gap-2">
-                          <Package className="w-4 h-4 text-brand-muted" />Mes commandes
-                        </button>
-                        {isStaff && (
-                          <button onClick={() => { setView({ kind: 'admin-dashboard' }); setUserMenuOpen(false); }}
-                            className="w-full text-left px-3 py-2.5 text-sm hover:bg-brand-surface flex items-center gap-2">
-                            <Settings className="w-4 h-4 text-brand-muted" />Espace administrateur
-                          </button>
-                        )}
-                        <button onClick={() => { signOut(); setUserMenuOpen(false); }}
-                          className="w-full text-left px-3 py-2.5 text-sm hover:bg-brand-surface flex items-center gap-2 text-odoo-danger border-t border-brand-border">
-                          <LogOut className="w-4 h-4" />Déconnexion
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              ) : (
-                <button onClick={() => setView({ kind: 'auth' })} className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium bg-white/10 hover:bg-white/20 rounded-md transition">
-                  <User className="w-4 h-4" /><span className="hidden sm:inline">Connexion</span>
-                </button>
-              )}
-
-              <button className="md:hidden p-2 hover:bg-white/10 rounded-md transition" onClick={() => setMobileOpen(true)}>
-                <Menu className="w-5 h-5" />
+              {/* Mobile hamburger menu toggle */}
+              <button
+                onClick={() => setMobileOpen(!mobileOpen)}
+                className="md:hidden p-2 hover:bg-white/10 rounded-md transition"
+                aria-label="Menu"
+              >
+                <Menu className="w-6 h-6" />
               </button>
             </div>
           </div>
-        </div>
-      </header>
 
-      {/* ── Mobile drawer ─────────────────────────────────────────────────── */}
-      {mobileOpen && (
-        <div className="fixed inset-0 z-50 md:hidden">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
-          <div className="absolute right-0 top-0 bottom-0 w-72 bg-white shadow-xl flex flex-col">
-            <div className="p-4 border-b border-brand-border flex items-center justify-between">
-              <span className="font-semibold text-brand-dark">Menu</span>
-              <button onClick={() => setMobileOpen(false)} className="p-1 hover:bg-brand-surface rounded"><X className="w-5 h-5" /></button>
+          {/* Mobile search input */}
+          {!isAdminView && (
+            <div className="pb-3 md:hidden">
+              <form onSubmit={handleSearchSubmit} className="flex w-full">
+                <input
+                  type="text"
+                  value={headerSearch}
+                  onChange={(e) => setHeaderSearch(e.target.value)}
+                  placeholder="Rechercher une boisson..."
+                  className="flex-1 bg-white text-gray-900 placeholder-gray-400 text-xs px-3.5 py-2 rounded-l-full focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  className="bg-[#D10024] hover:bg-[#A8001D] text-white px-4 py-2 rounded-r-full font-bold text-xs uppercase"
+                >
+                  <Search className="w-3.5 h-3.5" />
+                </button>
+              </form>
             </div>
-            <nav className="flex-1 p-2 overflow-auto">
-              {isAdminView ? (
-                <>
-                  {adminNav.map((item) => (
-                    <button key={item.kind} onClick={() => { setView({ kind: item.kind }); setMobileOpen(false); }}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-brand-dark hover:bg-brand-surface rounded-md text-left">
-                      <span className="text-brand-muted">{item.icon}</span>{item.label}
+          )}
+        </div>
+
+        {/* ── 3. ELECTRO NAVIGATION BAR (White #FFFFFF with Red Accent) ─────── */}
+        {!isAdminView && (
+          <div className="bg-white border-t border-[#E4E7ED] text-[#2B2D42] hidden md:block shadow-sm">
+            <div className="max-w-7xl mx-auto px-4 lg:px-6">
+              <div className="h-12 flex items-center justify-between">
+                
+                {/* Categories Dropdown Button */}
+                <div className="relative" ref={categoriesMenuRef}>
+                  <button
+                    onClick={() => setCategoriesMenuOpen(!categoriesMenuOpen)}
+                    className="bg-[#D10024] hover:bg-[#A8001D] text-white text-xs font-bold uppercase tracking-wider px-4 py-3 flex items-center gap-2 transition"
+                  >
+                    <Menu className="w-4 h-4" />
+                    <span>Tous nos rayons</span>
+                    <ChevronDown className="w-3.5 h-3.5 ml-1" />
+                  </button>
+
+                  {categoriesMenuOpen && (
+                    <div className="absolute left-0 top-full mt-1 w-64 bg-white rounded-lg shadow-2xl border border-gray-200 py-2 z-50 animate-fade-in-scale">
+                      {DEFAULT_CATEGORIES.map((cat) => (
+                        <button
+                          key={cat.id}
+                          onClick={() => handleCategoryNav(cat.id)}
+                          className="w-full text-left px-4 py-2.5 text-xs font-semibold text-gray-700 hover:text-[#D10024] hover:bg-gray-50 flex items-center justify-between transition"
+                        >
+                          <span>{cat.name}</span>
+                          <span className="text-[10px] text-gray-400">→</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Main Nav Links (Electro style active underline) */}
+                <nav className="flex items-center gap-1 lg:gap-3 text-xs font-bold uppercase tracking-wide">
+                  <button
+                    onClick={() => setView({ kind: 'shop' })}
+                    className={`h-12 px-3 flex items-center border-b-2 transition ${
+                      view.kind === 'shop' && !headerCategory
+                        ? 'border-[#D10024] text-[#D10024]'
+                        : 'border-transparent text-gray-700 hover:text-[#D10024] hover:border-[#D10024]'
+                    }`}
+                  >
+                    Accueil
+                  </button>
+
+                  {navCategories.map((cat) => (
+                    <button
+                      key={cat.id}
+                      onClick={() => handleCategoryNav(cat.id)}
+                      className="h-12 px-2.5 lg:px-3 flex items-center border-b-2 border-transparent text-gray-700 hover:text-[#D10024] hover:border-[#D10024] transition whitespace-nowrap"
+                    >
+                      {cat.label}
                     </button>
                   ))}
-                  <div className="my-2 border-t border-brand-border" />
-                  <button onClick={() => { setView({ kind: 'shop' }); setMobileOpen(false); }}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-brand-dark hover:bg-brand-surface rounded-md text-left">
-                    <span className="text-brand-muted"><Store className="w-4 h-4" /></span>Voir la boutique
+
+                  <button
+                    onClick={() => setView({ kind: 'shop' })}
+                    className="h-12 px-3 flex items-center gap-1.5 border-b-2 border-transparent text-[#D10024] hover:border-[#D10024] transition font-black"
+                  >
+                    <span className="inline-block w-2 h-2 rounded-full bg-[#D10024] animate-ping" />
+                    Promos
                   </button>
-                </>
+                </nav>
+
+                {/* Right Quick Info: Fast delivery */}
+                <div className="hidden xl:flex items-center gap-2 text-xs text-gray-500 font-medium">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-[#28A745]" />
+                  <span>Livraison Cotonou & Calavi sous 2h</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </header>
+
+      {/* ── 4. MOBILE SLIDE-OVER DRAWER ───────────────────────────────────── */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+          <div className="absolute right-0 top-0 bottom-0 w-80 bg-white shadow-2xl flex flex-col animate-fade-in-scale">
+            
+            <div className="p-4 bg-[#15161D] text-white flex items-center justify-between">
+              <div className="flex items-baseline gap-1">
+                <span className="font-black text-xl text-white">SAFFO</span>
+                <span className="text-[#D10024] font-black text-xl">.ONLINE</span>
+              </div>
+              <button onClick={() => setMobileOpen(false)} className="p-1 hover:bg-white/10 rounded">
+                <X className="w-5 h-5 text-white" />
+              </button>
+            </div>
+
+            <nav className="flex-1 p-3 overflow-y-auto divide-y divide-gray-100">
+              {isAdminView ? (
+                <div className="space-y-1 py-2">
+                  <p className="text-[11px] font-bold uppercase text-gray-400 px-3 pb-1">Modules Admin</p>
+                  {adminNav.map((item) => (
+                    <button
+                      key={item.kind}
+                      onClick={() => { setView({ kind: item.kind }); setMobileOpen(false); }}
+                      className="w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 rounded-lg text-left"
+                    >
+                      <span className="text-[#D10024]">{item.icon}</span>{item.label}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => { setView({ kind: 'shop' }); setMobileOpen(false); }}
+                    className="w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-[#D10024] hover:bg-red-50 rounded-lg text-left mt-2"
+                  >
+                    <Store className="w-4 h-4" />Voir la boutique
+                  </button>
+                </div>
               ) : (
                 <>
-                  <button onClick={() => { setView({ kind: 'shop' }); setMobileOpen(false); }}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-brand-dark hover:bg-brand-surface rounded-md text-left">
-                    <span className="text-brand-muted"><Store className="w-4 h-4" /></span>Boutique
-                  </button>
-                  <button onClick={() => { setView({ kind: 'cart' }); setMobileOpen(false); }}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-brand-dark hover:bg-brand-surface rounded-md text-left">
-                    <span className="text-brand-muted"><ShoppingCart className="w-4 h-4" /></span>Panier ({itemCount})
-                  </button>
-                  {user && (
-                    <button onClick={() => { setView({ kind: 'orders' }); setMobileOpen(false); }}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-brand-dark hover:bg-brand-surface rounded-md text-left">
-                      <span className="text-brand-muted"><Package className="w-4 h-4" /></span>Mes commandes
+                  <div className="space-y-1 py-2">
+                    <p className="text-[11px] font-bold uppercase text-gray-400 px-3 pb-1">Rayons Boissons</p>
+                    <button
+                      onClick={() => { setView({ kind: 'shop' }); setMobileOpen(false); }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-gray-900 hover:text-[#D10024] rounded-lg text-left"
+                    >
+                      <Store className="w-4 h-4 text-[#D10024]" />Toutes les Boissons
                     </button>
-                  )}
-                  <div className="my-2 border-t border-brand-border" />
-                  {isStaff && (
-                    <button onClick={() => { setView({ kind: 'admin-dashboard' }); setMobileOpen(false); }}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 text-sm text-brand-dark hover:bg-brand-surface rounded-md text-left">
-                      <span className="text-brand-muted"><LayoutDashboard className="w-4 h-4" /></span>Espace Admin
+                    {DEFAULT_CATEGORIES.map((cat) => (
+                      <button
+                        key={cat.id}
+                        onClick={() => handleCategoryNav(cat.id)}
+                        className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-700 hover:text-[#D10024] hover:bg-gray-50 rounded-lg text-left"
+                      >
+                        <span>{cat.name}</span>
+                        <span className="text-gray-400 text-[10px]">→</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="space-y-1 py-3">
+                    <p className="text-[11px] font-bold uppercase text-gray-400 px-3 pb-1">Espace Client</p>
+                    <button
+                      onClick={() => { setView({ kind: 'cart' }); setMobileOpen(false); }}
+                      className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 rounded-lg text-left"
+                    >
+                      <span className="flex items-center gap-2.5">
+                        <ShoppingCart className="w-4 h-4 text-gray-500" />
+                        Mon Panier
+                      </span>
+                      <span className="bg-[#D10024] text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                        {itemCount}
+                      </span>
                     </button>
-                  )}
+
+                    {user && (
+                      <button
+                        onClick={() => { setView({ kind: 'orders' }); setMobileOpen(false); }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50 rounded-lg text-left"
+                      >
+                        <Package className="w-4 h-4 text-gray-500" />Mes commandes
+                      </button>
+                    )}
+
+                    {isStaff && (
+                      <button
+                        onClick={() => { setView({ kind: 'admin-dashboard' }); setMobileOpen(false); }}
+                        className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-bold text-[#D10024] hover:bg-red-50 rounded-lg text-left"
+                      >
+                        <LayoutDashboard className="w-4 h-4" />Administration
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Direct Contact */}
+                  <div className="py-3 px-3 space-y-2">
+                    <p className="text-[11px] font-bold uppercase text-gray-400 pb-1">Assistance Dépôt</p>
+                    <a
+                      href={`tel:${cleanPhone}`}
+                      className="flex items-center gap-2 text-xs font-semibold text-gray-800"
+                    >
+                      <Phone className="w-3.5 h-3.5 text-[#D10024]" />
+                      {phoneNumber}
+                    </a>
+                    <a
+                      href={`https://wa.me/${cleanWhatsapp}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-xs font-semibold text-[#25D366]"
+                    >
+                      <IconWhatsapp className="w-3.5 h-3.5 text-[#25D366]" />
+                      Commander par WhatsApp
+                    </a>
+                  </div>
                 </>
               )}
             </nav>
+
             {user && (
-              <div className="p-3 border-t border-brand-border">
-                <button onClick={() => { signOut(); setMobileOpen(false); }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-odoo-danger hover:bg-brand-surface rounded-md">
-                  <LogOut className="w-4 h-4" />Déconnexion
+              <div className="p-3 border-t border-gray-100 bg-gray-50">
+                <button
+                  onClick={() => { signOut(); setMobileOpen(false); }}
+                  className="w-full flex items-center justify-center gap-2 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 rounded-lg"
+                >
+                  <LogOut className="w-3.5 h-3.5" />Déconnexion
                 </button>
               </div>
             )}
@@ -264,120 +709,182 @@ export function AppShell({ view, setView, children }: { view: View; setView: (v:
         </div>
       )}
 
-      <main className="flex-1 page-enter" key={view.kind}>{children}</main>
+      {/* ── 5. MAIN CONTENT ───────────────────────────────────────────────── */}
+      <main className="flex-1 page-enter" key={view.kind}>
+        {children}
+      </main>
 
-      {/* ── Footer ────────────────────────────────────────────────────────── */}
-      <footer className="bg-brand-dark text-white/70 mt-12">
-        {/* Main footer grid */}
-        <div className="max-w-7xl mx-auto px-4 lg:px-6 pt-10 pb-6">
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8 pb-8 border-b border-white/10">
+      {/* ── 6. ELECTRO FOOTER (Dark #15161D) ──────────────────────────────── */}
+      <footer className="bg-[#15161D] text-white/70 border-t-4 border-[#D10024] mt-16">
+        
+        {/* Main 4-column footer */}
+        <div className="max-w-7xl mx-auto px-4 lg:px-6 pt-12 pb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 pb-10 border-b border-white/10">
 
-            {/* Col 1: Brand + legal info */}
+            {/* Col 1: About SAFFO ONLINE */}
+            <div className="space-y-3">
+              <div className="flex items-baseline gap-1">
+                <span className="text-2xl font-black text-white tracking-tight uppercase">SAFFO</span>
+                <span className="text-[#D10024] text-2xl font-black">.</span>
+                <span className="text-sm font-extrabold text-[#D10024] tracking-widest uppercase">ONLINE</span>
+              </div>
+              <p className="text-xs text-white/60 leading-relaxed">
+                Fournisseur & dépôt agréé de produits de brasserie au Bénin. Vente en gros, demi-gros et détail de bières, vins, spiritueux, sodas et eaux minérales pour bars, maquis et événements.
+              </p>
+              <div className="space-y-1.5 text-xs text-white/60 pt-1">
+                <p className="flex items-center gap-2">
+                  <MapPin className="w-3.5 h-3.5 text-[#D10024] flex-shrink-0" />
+                  <span>Akpakpa PK3, Boulevard Saint-Michel, Cotonou</span>
+                </p>
+                <p className="flex items-center gap-2">
+                  <Phone className="w-3.5 h-3.5 text-[#D10024] flex-shrink-0" />
+                  <span>{phoneNumber}</span>
+                </p>
+                <p className="flex items-center gap-2">
+                  <Mail className="w-3.5 h-3.5 text-[#D10024] flex-shrink-0" />
+                  <span>contact@saffoonline.bj</span>
+                </p>
+              </div>
+            </div>
+
+            {/* Col 2: Nos Rayons */}
             <div>
-              <div className="flex items-center gap-2.5 mb-3">
-                {settings.logo_url ? (
-                  <img src={settings.logo_url} alt={storeName} className="h-8 w-auto object-contain brightness-0 invert" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+              <p className="text-xs font-bold uppercase tracking-wider text-white mb-4 relative pb-2 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-8 after:h-0.5 after:bg-[#D10024]">
+                Nos Rayons
+              </p>
+              <ul className="space-y-2 text-xs">
+                {DEFAULT_CATEGORIES.map((cat) => (
+                  <li key={cat.id}>
+                    <button
+                      onClick={() => handleCategoryNav(cat.id)}
+                      className="hover:text-[#D10024] hover:translate-x-1 transition-all inline-block"
+                    >
+                      {cat.name}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* Col 3: Services & Consignes au Bénin */}
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-white mb-4 relative pb-2 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-8 after:h-0.5 after:bg-[#D10024]">
+                Services Dépôt
+              </p>
+              <ul className="space-y-2 text-xs">
+                <li>
+                  <span className="text-white/80 font-medium">Échange de casiers vides</span>
+                  <p className="text-[11px] text-white/40">Système officiel Sobebra</p>
+                </li>
+                <li>
+                  <span className="text-white/80 font-medium">Tarifs Spécial Maquis & Bars</span>
+                  <p className="text-[11px] text-white/40">Remises dégressives sur volume</p>
+                </li>
+                <li>
+                  <span className="text-white/80 font-medium">Packs Cérémonies, Dots & Mariages</span>
+                  <p className="text-[11px] text-white/40">Reprise des bouteilles non entamées</p>
+                </li>
+                <li>
+                  <span className="text-white/80 font-medium">Livraison Glacée Express</span>
+                  <p className="text-[11px] text-white/40">Cotonou, Calavi et environs en 2h</p>
+                </li>
+              </ul>
+            </div>
+
+            {/* Col 4: Espace Client & Réseaux */}
+            <div className="space-y-4">
+              <p className="text-xs font-bold uppercase tracking-wider text-white mb-4 relative pb-2 after:content-[''] after:absolute after:bottom-0 after:left-0 after:w-8 after:h-0.5 after:bg-[#D10024]">
+                Espace Client
+              </p>
+              <ul className="space-y-2 text-xs">
+                <li>
+                  <button onClick={() => setView({ kind: 'cart' })} className="hover:text-[#D10024] transition">
+                    Mon Panier ({itemCount})
+                  </button>
+                </li>
+                {user ? (
+                  <li>
+                    <button onClick={() => setView({ kind: 'orders' })} className="hover:text-[#D10024] transition">
+                      Suivi de mes commandes
+                    </button>
+                  </li>
                 ) : (
-                  <Store className="w-5 h-5 text-white" />
+                  <li>
+                    <button onClick={() => setView({ kind: 'auth' })} className="hover:text-[#D10024] transition">
+                      Connexion / Créer un compte
+                    </button>
+                  </li>
                 )}
-                <span className="font-semibold text-white text-base">{storeName}</span>
-              </div>
-              {settings.company_name && (
-                <p className="text-sm text-white/60 mb-1">{settings.company_name}</p>
-              )}
-              {settings.rccm && (
-                <p className="text-xs text-white/50">RCCM : {settings.rccm}</p>
-              )}
-              {settings.ifu && (
-                <p className="text-xs text-white/50">IFU : {settings.ifu}</p>
-              )}
-              {!settings.company_name && !settings.rccm && !settings.ifu && (
-                <p className="text-xs text-white/40 italic">Informations légales à compléter</p>
-              )}
-            </div>
+                <li>
+                  <button onClick={() => setView({ kind: 'legal' })} className="hover:text-[#D10024] transition">
+                    Mentions Légales & IFU
+                  </button>
+                </li>
+                <li>
+                  <button onClick={() => setView({ kind: 'terms' })} className="hover:text-[#D10024] transition">
+                    Conditions Générales de Vente
+                  </button>
+                </li>
+              </ul>
 
-            {/* Col 2: Contact */}
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-white/50 mb-3">Contact</p>
-              <div className="space-y-2">
-                {settings.phone_number && (
-                  <a href={`tel:${settings.phone_number}`}
-                    className="flex items-center gap-2 text-sm hover:text-white transition">
-                    <Phone className="w-4 h-4 flex-shrink-0 text-white/40" />
-                    {settings.phone_number}
-                  </a>
-                )}
-                {settings.whatsapp_number && (
-                  <a href={`https://wa.me/${settings.whatsapp_number.replace(/\D/g, '')}`}
-                    target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-2 text-sm hover:text-white transition">
-                    <MessageCircle className="w-4 h-4 flex-shrink-0 text-white/40" />
-                    WhatsApp : {settings.whatsapp_number}
-                  </a>
-                )}
-                {!settings.phone_number && !settings.whatsapp_number && (
-                  <p className="text-xs text-white/40 italic">Contact à compléter</p>
-                )}
-              </div>
-            </div>
-
-            {/* Col 3: Social media */}
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-white/50 mb-3">Suivez-nous</p>
-              <div className="flex items-center gap-2 flex-wrap">
-                {settings.whatsapp_url && (
-                  <a href={settings.whatsapp_url} target="_blank" rel="noopener noreferrer"
-                    className="w-9 h-9 rounded-lg bg-white/10 hover:bg-[#25D366] flex items-center justify-center transition-colors"
-                    title="WhatsApp">
+              {/* Social networks */}
+              <div className="pt-2">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-white/40 mb-2">
+                  Suivez notre actualité
+                </p>
+                <div className="flex items-center gap-2">
+                  <a
+                    href={`https://wa.me/${cleanWhatsapp}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-8 h-8 rounded-full bg-white/10 hover:bg-[#25D366] flex items-center justify-center transition-colors"
+                    title="WhatsApp"
+                  >
                     <IconWhatsapp className="w-4 h-4 text-white" />
                   </a>
-                )}
-                {settings.facebook_url && (
-                  <a href={settings.facebook_url} target="_blank" rel="noopener noreferrer"
-                    className="w-9 h-9 rounded-lg bg-white/10 hover:bg-[#1877F2] flex items-center justify-center transition-colors"
-                    title="Facebook">
+                  <a
+                    href="https://facebook.com/saffoonline"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-8 h-8 rounded-full bg-white/10 hover:bg-[#1877F2] flex items-center justify-center transition-colors"
+                    title="Facebook"
+                  >
                     <IconFacebook className="w-4 h-4 text-white" />
                   </a>
-                )}
-                {settings.tiktok_url && (
-                  <a href={settings.tiktok_url} target="_blank" rel="noopener noreferrer"
-                    className="w-9 h-9 rounded-lg bg-white/10 hover:bg-[#010101] hover:ring-1 hover:ring-white/20 flex items-center justify-center transition-colors"
-                    title="TikTok">
+                  <a
+                    href="https://tiktok.com/@saffoonline"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-8 h-8 rounded-full bg-white/10 hover:bg-black hover:ring-1 hover:ring-white/30 flex items-center justify-center transition-colors"
+                    title="TikTok"
+                  >
                     <IconTiktok className="w-4 h-4 text-white" />
                   </a>
-                )}
-                {!settings.whatsapp_url && !settings.facebook_url && !settings.tiktok_url && (
-                  <p className="text-xs text-white/40 italic">Réseaux sociaux à configurer</p>
-                )}
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Bottom bar */}
-          <div className="pt-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-white/40">
-            <span>© {year} {settings.company_name || storeName}. Tous droits réservés.</span>
-            <div className="flex items-center gap-4">
-              <button onClick={() => setView({ kind: 'legal' })}
-                className="hover:text-white transition flex items-center gap-1">
-                <Scale className="w-3 h-3" />Mentions légales
-              </button>
-              <span className="text-white/20">·</span>
-              <button onClick={() => setView({ kind: 'terms' })}
-                className="hover:text-white transition flex items-center gap-1">
-                <FileText className="w-3 h-3" />CGU
-              </button>
-              {isStaff && (
-                <>
-                  <span className="text-white/20">·</span>
-                  <button onClick={() => setView({ kind: 'admin-dashboard' })}
-                    className="hover:text-white transition flex items-center gap-1">
-                    <Settings className="w-3 h-3" />Administration
-                  </button>
-                </>
-              )}
-              <span className="text-white/20">·</span>
-              <span className="flex items-center gap-1">
-                <ExternalLink className="w-3 h-3" />PWA
+          {/* Bottom Bar: Copyright & Payment methods accepted in Benin */}
+          <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-white/50">
+            <div>
+              © {year} <span className="text-white font-semibold">{storeName}</span>. Tous droits réservés · RCCM : RB/COT/21 B 29841 · IFU : 3202112489012.
+            </div>
+
+            {/* Payment methods badges */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] uppercase font-bold text-white/40 mr-1">Règlements sécurisés :</span>
+              <span className="bg-[#FFCC00] text-black font-extrabold text-[10px] px-2 py-0.5 rounded shadow-sm">
+                MTN MoMo
+              </span>
+              <span className="bg-[#005CA9] text-white font-bold text-[10px] px-2 py-0.5 rounded shadow-sm">
+                Moov Money
+              </span>
+              <span className="bg-[#00838F] text-white font-bold text-[10px] px-2 py-0.5 rounded shadow-sm">
+                Celtiis Flooz
+              </span>
+              <span className="bg-white/10 text-white font-medium text-[10px] px-2 py-0.5 rounded">
+                Espèces à la livraison
               </span>
             </div>
           </div>

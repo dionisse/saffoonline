@@ -1,27 +1,28 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Search, Tag, Package2, Plus, AlertCircle, CheckCircle2,
-  ChevronLeft, ChevronRight, Clock, ArrowRight, Flame, Sparkles,
-  Truck, RotateCcw, ShieldCheck, Headphones, ShoppingCart, SlidersHorizontal,
-  X, ArrowLeft,
+  AlertCircle, ChevronLeft, ChevronRight,
+  Clock, ArrowRight, Truck, ShieldCheck, ShoppingCart,
+  X, Heart, Eye, Share2, Star,
+  Sparkles, Check, Layers, RotateCcw,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { formatPrice, parseImages } from '../lib/format';
+import { formatPrice } from '../lib/format';
 import { useStoreSettings } from '../contexts/StoreSettingsContext';
-import type { Banner, Category, Product, Promotion, Publication } from '../lib/database.types';
 import { useCart } from '../contexts/CartContext';
-import { LazyImage, SkeletonCard, StaggerItem, useRipple, useToast } from '../components/ui';
+import { useWishlist } from '../contexts/WishlistContext';
+import { useToast } from '../components/ui';
+import type { Banner, Category, Product, Publication } from '../lib/database.types';
 import type { View } from '../lib/views';
+import {
+  DEFAULT_CATEGORIES,
+  DEFAULT_PRODUCTS,
+  DEFAULT_BANNERS,
+  DEFAULT_PUBLICATIONS,
+  DEFAULT_TESTIMONIALS,
+} from '../data/breweryCatalog';
 
-// ─── PublicationsSection ──────────────────────────────────────────────────────
+// ─── Social icon SVGs ────────────────────────────────────────────────────────
 
-function IconFacebook({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-    </svg>
-  );
-}
 function IconWhatsapp({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="currentColor">
@@ -29,198 +30,224 @@ function IconWhatsapp({ className }: { className?: string }) {
     </svg>
   );
 }
-function IconTiktokShop({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor">
-      <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-2.88 2.5 2.89 2.89 0 01-2.89-2.89 2.89 2.89 0 012.89-2.89c.28 0 .54.04.79.1V9.01a6.33 6.33 0 00-.79-.05 6.34 6.34 0 00-6.34 6.34 6.34 6.34 0 006.34 6.34 6.34 6.34 0 006.33-6.34V8.95a8.16 8.16 0 004.77 1.52V7.03a4.85 4.85 0 01-1-.34z"/>
-    </svg>
-  );
-}
 
-function PublicationsSection() {
-  const [pubs, setPubs] = useState<Publication[]>([]);
+// ─── DYNAMIC BREWERY CAROUSEL BANNER (Electro Aesthetic + Benin Context) ─────
 
-  useEffect(() => {
-    supabase.from('publications').select('*').eq('active', true).order('created_at', { ascending: false }).limit(6)
-      .then(({ data }) => setPubs((data as Publication[]) ?? []));
-  }, []);
-
-  if (pubs.length === 0) return null;
-
-  function shareToFacebook(pub: Publication) {
-    const url = encodeURIComponent(pub.link_url || window.location.origin);
-    const quote = encodeURIComponent(`${pub.title}\n\n${pub.content}`);
-    window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}&quote=${quote}`, '_blank', 'width=600,height=500');
-  }
-  function shareToWhatsApp(pub: Publication) {
-    const lines = [`*${pub.title}*`, '', pub.content, '', pub.link_url || window.location.origin];
-    window.open(`https://wa.me/?text=${encodeURIComponent(lines.join('\n'))}`, '_blank');
-  }
-  async function shareToTikTok(pub: Publication) {
-    const text = `${pub.title}\n\n${pub.content}\n\n${pub.link_url || window.location.origin}`;
-    await navigator.clipboard.writeText(text).catch(() => {});
-    window.open('https://www.tiktok.com', '_blank');
-  }
-
-  return (
-    <section className="mb-12">
-      <div className="flex items-end justify-between mb-6">
-        <div>
-          <p className="text-xs font-semibold tracking-widest text-brand-primary uppercase mb-1">Nos actualités</p>
-          <h2 className="text-2xl lg:text-3xl font-black text-brand-dark">Publications & Offres</h2>
-        </div>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {pubs.map((pub) => (
-          <div key={pub.id} className="card flex flex-col overflow-hidden hover:-translate-y-1 hover:shadow-xl transition-all duration-300">
-            {pub.image_url && (
-              <img src={pub.image_url} alt={pub.title} className="w-full h-44 object-cover" onError={e => { (e.target as HTMLImageElement).style.display='none'; }} />
-            )}
-            <div className="p-4 flex-1 flex flex-col">
-              <p className="font-bold text-brand-dark leading-snug mb-1.5">{pub.title}</p>
-              <p className="text-sm text-brand-muted leading-relaxed flex-1 line-clamp-3">{pub.content}</p>
-              {pub.link_url && (
-                <a href={pub.link_url} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-brand-primary font-semibold mt-2 hover:underline">
-                  En savoir plus <ArrowRight className="w-3 h-3" />
-                </a>
-              )}
-            </div>
-            <div className="border-t border-brand-border bg-brand-surface px-3 py-2.5 flex items-center gap-1.5">
-              <span className="text-xs text-brand-muted font-medium mr-1">Partager :</span>
-              <button onClick={() => shareToFacebook(pub)}
-                className="w-7 h-7 rounded-lg bg-[#1877F2] flex items-center justify-center hover:opacity-80 transition flex-shrink-0" title="Facebook">
-                <IconFacebook className="w-3.5 h-3.5 text-white" />
-              </button>
-              <button onClick={() => shareToWhatsApp(pub)}
-                className="w-7 h-7 rounded-lg bg-[#25D366] flex items-center justify-center hover:opacity-80 transition flex-shrink-0" title="WhatsApp">
-                <IconWhatsapp className="w-3.5 h-3.5 text-white" />
-              </button>
-              <button onClick={() => shareToTikTok(pub)}
-                className="w-7 h-7 rounded-lg bg-[#010101] flex items-center justify-center hover:opacity-80 transition flex-shrink-0" title="TikTok">
-                <IconTiktokShop className="w-3.5 h-3.5 text-white" />
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-// ─── Countdown ────────────────────────────────────────────────────────────────
-
-function Countdown({ endsAt }: { endsAt: string }) {
-  const [remaining, setRemaining] = useState<{ d: number; h: number; m: number; s: number } | null>(null);
-
-  useEffect(() => {
-    function calc() {
-      const diff = new Date(endsAt).getTime() - Date.now();
-      if (diff <= 0) { setRemaining(null); return; }
-      setRemaining({
-        d: Math.floor(diff / 86400000),
-        h: Math.floor((diff % 86400000) / 3600000),
-        m: Math.floor((diff % 3600000) / 60000),
-        s: Math.floor((diff % 60000) / 1000),
-      });
-    }
-    calc();
-    const id = setInterval(calc, 1000);
-    return () => clearInterval(id);
-  }, [endsAt]);
-
-  if (!remaining) return <span className="text-xs opacity-70">Expiré</span>;
-  const pad = (n: number) => String(n).padStart(2, '0');
-
-  return (
-    <div className="flex items-center gap-1 text-xs font-bold">
-      <Clock className="w-3 h-3 opacity-60 flex-shrink-0" />
-      {remaining.d > 0 && <span className="bg-white/20 px-1.5 py-0.5 rounded">{remaining.d}j</span>}
-      <span className="bg-white/20 px-1.5 py-0.5 rounded">{pad(remaining.h)}h</span>
-      <span className="bg-white/20 px-1.5 py-0.5 rounded">{pad(remaining.m)}m</span>
-      <span className="bg-white/20 px-1.5 py-0.5 rounded">{pad(remaining.s)}s</span>
-    </div>
-  );
-}
-
-// ─── Banner carousel ──────────────────────────────────────────────────────────
-
-function BannerCarousel({ banners, onAction }: { banners: Banner[]; onAction: (a: string | null) => void }) {
-  const [active, setActive] = useState(0);
+function DynamicBreweryCarousel({ banners, onAction, whatsappNumber }: { banners: Banner[]; onAction: (catId: string | null) => void; whatsappNumber: string }) {
+  const [current, setCurrent] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [progress, setProgress] = useState(0);
 
+  const cleanWhatsapp = whatsappNumber.replace(/\D/g, '');
+
+  // Progress timer for ultra-smooth dynamic carousel
   useEffect(() => {
-    if (banners.length <= 1 || paused) return;
-    const id = setInterval(() => setActive((i) => (i + 1) % banners.length), 5500);
-    return () => clearInterval(id);
-  }, [banners.length, paused]);
+    if (paused || banners.length <= 1) return;
 
-  if (banners.length === 0) return null;
-  const b = banners[active];
+    const interval = 50; // ms
+    const totalDuration = 6000; // ms
+    const step = (interval / totalDuration) * 100;
+
+    const timer = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 100) {
+          setCurrent((c) => (c + 1) % banners.length);
+          return 0;
+        }
+        return prev + step;
+      });
+    }, interval);
+
+    return () => clearInterval(timer);
+  }, [paused, banners.length]);
+
+  // Reset progress when current slide changes manually
+  const goToSlide = (idx: number) => {
+    setCurrent(idx);
+    setProgress(0);
+  };
+
+  const nextSlide = () => {
+    setCurrent((c) => (c + 1) % banners.length);
+    setProgress(0);
+  };
+
+  const prevSlide = () => {
+    setCurrent((c) => (c === 0 ? banners.length - 1 : c - 1));
+    setProgress(0);
+  };
+
+  if (!banners || banners.length === 0) return null;
+
+  const b = banners[current];
+
+  // Benin brewery custom highlights according to current slide
+  const slideBadges = [
+    'FOURNISSEUR AGRÉÉ SOBEBRA · BÉNIN',
+    'MARIAGES · DOTS · CÉRÉMONIES AU BÉNIN',
+    'RAFRAÎCHISSEMENTS & SOFT DRINKS BÉNINOIS',
+    'ESPACE GROSSISTE · MAQUIS & BARS',
+  ];
+
+  const slideHighlights = [
+    ['Consignes échangeables', 'Glace offerte dès 5 casiers', 'Livraison express Cotonou & Calavi en 2h'],
+    ['Grandes cuvées fraîches', 'Reprise des bouteilles non entamées', 'Verres & flûtes sur demande'],
+    ['Packs d’eau Possotomé 1.5L & 0.5L', 'Youki Cocktail & Pamplemousse', 'Stock permanent garanti'],
+    ['Tarifs dégressifs sur volume', 'Factures normalisées avec IFU', 'Paiement MTN MoMo & Moov sécurisé'],
+  ];
+
+  const slidePrices = [
+    'À partir de 6 400 FCFA le casier',
+    'Remises par carton complet',
+    'Dès 4 500 FCFA le casier',
+    'Jusqu’à -15% sur volume',
+  ];
+
+  const currentBadge = slideBadges[current % slideBadges.length];
+  const currentHighlights = slideHighlights[current % slideHighlights.length];
+  const currentPrice = slidePrices[current % slidePrices.length];
 
   return (
     <div
-      className="relative w-full overflow-hidden"
-      style={{ height: 'clamp(320px, 62vh, 680px)' }}
+      className="relative w-full overflow-hidden bg-[#15161D] text-white shadow-2xl rounded-2xl border border-[#2B2D42]"
+      style={{ minHeight: '440px', height: 'clamp(440px, 62vh, 620px)' }}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
     >
+      {/* Background slide images with crossfade & zoom */}
       {banners.map((banner, i) => (
-        <div key={banner.id}
-          className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${i === active ? 'opacity-100 z-10' : 'opacity-0 z-0'}`}>
-          <img src={banner.image_url} alt={banner.title ?? ''} loading={i === 0 ? 'eager' : 'lazy'}
-            className="absolute inset-0 w-full h-full object-cover scale-[1.02] transition-transform duration-[8000ms] ease-out"
-            style={{ transform: i === active ? 'scale(1)' : 'scale(1.04)' }} />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-black/10" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+        <div
+          key={banner.id || i}
+          className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
+            i === current ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
+          }`}
+        >
+          <img
+            src={banner.image_url}
+            alt={banner.title ?? 'Bannière Brasserie'}
+            className="w-full h-full object-cover transition-transform duration-[7000ms] ease-out"
+            style={{
+              transform: i === current ? 'scale(1.05)' : 'scale(1)',
+            }}
+          />
+          {/* Gradients overlay for maximum text readability and Electro vibe */}
+          <div className="absolute inset-0 bg-gradient-to-r from-[#15161D]/95 via-[#15161D]/75 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#15161D]/80 via-transparent to-black/30" />
         </div>
       ))}
 
+      {/* Slide Content Box */}
       <div className="absolute inset-0 z-20 flex items-center">
-        <div className="max-w-7xl mx-auto w-full px-6 lg:px-12">
-          {b.title && (
-            <p className="text-white/70 text-sm font-medium tracking-widest uppercase mb-3 animate-fade-in-up">
-              Collection
-            </p>
-          )}
-          {b.title && (
-            <h2 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-black text-white leading-none mb-4 animate-fade-in-up drop-shadow-lg"
-              style={{ animationDelay: '60ms' }}>
+        <div className="max-w-7xl mx-auto w-full px-6 sm:px-10 lg:px-14">
+          <div className="max-w-2xl space-y-4">
+            
+            {/* Animated Badge */}
+            <div className="inline-flex items-center gap-2 bg-[#D10024] text-white text-[11px] font-black uppercase tracking-widest px-3 py-1 rounded-full shadow-lg animate-fade-in-up">
+              <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+              <span>{currentBadge}</span>
+            </div>
+
+            {/* Main Headline */}
+            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-white leading-tight drop-shadow-md animate-fade-in-up">
               {b.title}
-            </h2>
-          )}
-          {b.subtitle && (
-            <p className="text-white/80 text-base lg:text-lg max-w-lg leading-relaxed mb-8 animate-fade-in-up"
-              style={{ animationDelay: '120ms' }}>
+            </h1>
+
+            {/* Subtitle description */}
+            <p className="text-white/85 text-sm sm:text-base leading-relaxed line-clamp-3 animate-fade-in-up max-w-xl">
               {b.subtitle}
             </p>
-          )}
-          {b.cta_text && (
-            <button onClick={() => onAction(b.cta_action)}
-              className="group inline-flex items-center gap-3 bg-white text-brand-dark font-bold px-7 py-3.5 rounded-full text-sm hover:bg-brand-primary hover:text-white transition-all duration-300 shadow-xl animate-fade-in-up"
-              style={{ animationDelay: '180ms' }}>
-              {b.cta_text}
-              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-            </button>
-          )}
+
+            {/* Feature bullets in Benin context */}
+            <div className="hidden sm:flex flex-wrap items-center gap-3 pt-1 text-xs text-white/90">
+              {currentHighlights.map((hl, idx) => (
+                <div key={idx} className="flex items-center gap-1.5 bg-black/40 backdrop-blur-md px-2.5 py-1 rounded-md border border-white/10">
+                  <Check className="w-3.5 h-3.5 text-[#28A745] flex-shrink-0" />
+                  <span>{hl}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Price Pill Highlight */}
+            <div className="pt-2">
+              <span className="inline-block bg-[#FFB300] text-black font-extrabold text-xs sm:text-sm px-3.5 py-1.5 rounded-full shadow-md">
+                {currentPrice}
+              </span>
+            </div>
+
+            {/* CTA Action Buttons */}
+            <div className="pt-3 flex flex-wrap items-center gap-3">
+              <button
+                onClick={() => onAction(b.cta_action)}
+                className="btn-electro text-xs py-3 px-6 shadow-xl flex items-center gap-2 group hover:scale-105"
+              >
+                <ShoppingCart className="w-4 h-4" />
+                <span>{b.cta_text || 'Commander en Gros'}</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </button>
+
+              <a
+                href={`https://wa.me/${cleanWhatsapp}?text=${encodeURIComponent(
+                  `Bonjour Saffo Online, je suis intéressé par l'offre : ${b.title}`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 bg-[#25D366]/20 hover:bg-[#25D366] text-white border border-[#25D366] text-xs font-bold uppercase tracking-wider px-5 py-3 rounded-full transition-all duration-200 shadow-lg backdrop-blur-sm"
+              >
+                <IconWhatsapp className="w-4 h-4 text-[#25D366] group-hover:text-white" />
+                <span>Devis WhatsApp</span>
+              </a>
+            </div>
+
+          </div>
         </div>
       </div>
 
+      {/* Prev / Next navigation arrows */}
       {banners.length > 1 && (
         <>
-          <button onClick={() => { setActive((i) => (i === 0 ? banners.length - 1 : i - 1)); setPaused(true); }}
-            className="absolute left-4 lg:left-6 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-white/10 hover:bg-white/25 backdrop-blur-sm text-white border border-white/20 flex items-center justify-center transition-all hover:scale-110">
-            <ChevronLeft className="w-5 h-5" />
+          <button
+            onClick={prevSlide}
+            aria-label="Diapositive précédente"
+            className="absolute left-3 sm:left-5 top-1/2 -translate-y-1/2 z-30 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-black/40 hover:bg-[#D10024] backdrop-blur-sm text-white border border-white/20 flex items-center justify-center transition-all duration-200 hover:scale-110 shadow-lg"
+          >
+            <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
-          <button onClick={() => { setActive((i) => (i + 1) % banners.length); setPaused(true); }}
-            className="absolute right-4 lg:right-6 top-1/2 -translate-y-1/2 z-30 w-11 h-11 rounded-full bg-white/10 hover:bg-white/25 backdrop-blur-sm text-white border border-white/20 flex items-center justify-center transition-all hover:scale-110">
-            <ChevronRight className="w-5 h-5" />
+
+          <button
+            onClick={nextSlide}
+            aria-label="Diapositive suivante"
+            className="absolute right-3 sm:right-5 top-1/2 -translate-y-1/2 z-30 w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-black/40 hover:bg-[#D10024] backdrop-blur-sm text-white border border-white/20 flex items-center justify-center transition-all duration-200 hover:scale-110 shadow-lg"
+          >
+            <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
-          <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 flex gap-2">
+
+          {/* Slide counter indicator top-right (e.g. 01 / 04) */}
+          <div className="absolute top-4 right-4 z-30 bg-black/50 backdrop-blur-md px-3 py-1 rounded-full text-xs font-mono font-bold text-white/90 border border-white/10 hidden sm:block">
+            <span className="text-[#D10024]">0{current + 1}</span> / 0{banners.length}
+          </div>
+
+          {/* Bottom Thumbnails / Indicator Pills */}
+          <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-2">
             {banners.map((_, i) => (
-              <button key={i} onClick={() => { setActive(i); setPaused(true); }}
-                className={`rounded-full transition-all duration-400 ${i === active ? 'bg-white w-8 h-2' : 'bg-white/40 w-2 h-2 hover:bg-white/70'}`} />
+              <button
+                key={i}
+                onClick={() => goToSlide(i)}
+                aria-label={`Aller au slide ${i + 1}`}
+                className={`transition-all duration-300 rounded-full ${
+                  i === current
+                    ? 'w-8 h-2.5 bg-[#D10024] shadow-md'
+                    : 'w-2.5 h-2.5 bg-white/40 hover:bg-white/80'
+                }`}
+              />
             ))}
+          </div>
+
+          {/* Dynamic Progress Bar at very bottom of carousel */}
+          <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10 z-30">
+            <div
+              className="h-full bg-[#D10024] transition-all duration-100 ease-linear"
+              style={{ width: `${progress}%` }}
+            />
           </div>
         </>
       )}
@@ -228,26 +255,68 @@ function BannerCarousel({ banners, onAction }: { banners: Banner[]; onAction: (a
   );
 }
 
-// ─── Trust bar ────────────────────────────────────────────────────────────────
+// ─── 3 ELECTRO COLLECTION PROMO TILES ────────────────────────────────────────
 
-function TrustBar() {
-  const features = [
-    { icon: Truck,        title: 'Livraison Cotonou',   desc: 'Dans tout le Bénin' },
-    { icon: RotateCcw,    title: 'Retours faciles',     desc: '7 jours pour changer' },
-    { icon: ShieldCheck,  title: 'Paiement sécurisé',   desc: 'Mobile Money & espèces' },
-    { icon: Headphones,   title: 'Assistance client',   desc: 'Réponse rapide' },
+function ElectroCollectionTiles({ onSelect }: { onSelect: (catId: string) => void }) {
+  const collections = [
+    {
+      id: 'cat-bieres',
+      title: 'Bières & Casiers',
+      subtitle: 'La Béninoise, Castel, Beaufort en casiers consignés',
+      image: '/banners/promo_beers.jpg',
+      cta: 'Commander maintenant',
+      badge: 'PROMO CASIERS',
+    },
+    {
+      id: 'cat-vins-champagnes',
+      title: 'Vins & Champagnes',
+      subtitle: 'Moët & Chandon, Bordeaux pour dots & cérémonies',
+      image: '/banners/promo_wine.jpg',
+      cta: 'Découvrir la cave',
+      badge: 'RÉCEPTIONS BÉNIN',
+    },
+    {
+      id: 'cat-softs-jus',
+      title: 'Softs & Eau Pure',
+      subtitle: 'Youki, World Cola, Packs Possotomé au prix dépôt',
+      image: '/banners/promo_softs.jpg',
+      cta: 'Faire le plein',
+      badge: 'PRIX DÉPÔT',
+    },
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-odoo-border border border-brand-border rounded-2xl overflow-hidden bg-white my-8 shadow-sm">
-      {features.map(({ icon: Icon, title, desc }) => (
-        <div key={title} className="flex items-center gap-3 px-5 py-4">
-          <div className="w-10 h-10 rounded-xl bg-brand-primary/10 flex items-center justify-center flex-shrink-0">
-            <Icon className="w-5 h-5 text-brand-primary" />
-          </div>
-          <div>
-            <p className="font-semibold text-sm text-brand-dark">{title}</p>
-            <p className="text-xs text-brand-muted">{desc}</p>
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-5 my-8">
+      {collections.map((col) => (
+        <div
+          key={col.id}
+          onClick={() => onSelect(col.id)}
+          className="group relative h-56 sm:h-60 rounded-xl overflow-hidden cursor-pointer shadow-md hover:shadow-xl transition-all duration-300 border border-gray-200"
+        >
+          {/* Background image */}
+          <img
+            src={col.image}
+            alt={col.title}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+          />
+          {/* Electro diagonal / gradient dark overlay */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#15161D]/90 via-[#15161D]/50 to-transparent" />
+
+          {/* Content */}
+          <div className="absolute inset-0 p-5 flex flex-col justify-end text-white">
+            <span className="text-[10px] font-black uppercase tracking-wider text-[#FFB300] mb-1">
+              {col.badge}
+            </span>
+            <h3 className="text-xl font-black leading-tight text-white group-hover:text-[#FFB300] transition-colors">
+              {col.title}
+            </h3>
+            <p className="text-xs text-white/80 line-clamp-1 mt-1 mb-3">
+              {col.subtitle}
+            </p>
+            <div className="inline-flex items-center gap-1.5 text-xs font-bold text-white uppercase tracking-wider group-hover:text-[#D10024] group-hover:translate-x-1 transition-all">
+              <span>{col.cta}</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </div>
           </div>
         </div>
       ))}
@@ -255,658 +324,1043 @@ function TrustBar() {
   );
 }
 
-// ─── Category section ─────────────────────────────────────────────────────────
+// ─── TRUST & VALUE BAR (Electro 4 Value Props for Benin) ─────────────────────
 
-function CategorySection({ categories, products, onSelect }: {
-  categories: Category[];
-  products: Product[];
-  onSelect: (id: string) => void;
-}) {
-  if (categories.length === 0) return null;
-
-  return (
-    <section className="mb-12">
-      <div className="flex items-end justify-between mb-6">
-        <div>
-          <p className="text-xs font-semibold tracking-widest text-brand-primary uppercase mb-1">Parcourez</p>
-          <h2 className="text-2xl lg:text-3xl font-black text-brand-dark">Nos gammes de boissons</h2>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-        {categories.map((cat, i) => {
-          const count = products.filter((p) => p.category_id === cat.id).length;
-          return (
-            <StaggerItem key={cat.id} index={i}>
-              <button
-                onClick={() => onSelect(cat.id)}
-                className="group w-full relative overflow-hidden rounded-2xl bg-brand-surface aspect-[3/4] focus:outline-none"
-              >
-                {cat.image_url ? (
-                  <img src={cat.image_url} alt={cat.name}
-                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-700 ease-out" />
-                ) : (
-                  <div className="absolute inset-0 bg-gradient-to-br from-brand-primary/20 to-brand-primary/5 flex items-center justify-center">
-                    <Package2 className="w-10 h-10 text-brand-primary/40" />
-                  </div>
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent" />
-                <div className="absolute inset-0 bg-brand-primary/0 group-hover:bg-brand-primary/20 transition-colors duration-300" />
-                <div className="absolute bottom-0 left-0 right-0 p-3 text-left">
-                  <p className="font-bold text-white text-sm leading-tight drop-shadow">{cat.name}</p>
-                  <p className="text-white/60 text-xs mt-0.5">{count} articles</p>
-                </div>
-              </button>
-            </StaggerItem>
-          );
-        })}
-      </div>
-    </section>
-  );
-}
-
-// ─── Promotion card ───────────────────────────────────────────────────────────
-
-const BADGE_STYLES: Record<string, string> = {
-  red:    'bg-red-500 text-white',
-  orange: 'bg-orange-500 text-white',
-  green:  'bg-emerald-500 text-white',
-  blue:   'bg-blue-500 text-white',
-  yellow: 'bg-yellow-400 text-yellow-900',
-};
-
-const CARD_GRADIENTS = [
-  'from-rose-600 to-orange-500',
-  'from-blue-700 to-cyan-500',
-  'from-emerald-700 to-teal-500',
-  'from-violet-700 to-fuchsia-500',
-  'from-amber-600 to-yellow-500',
-  'from-pink-700 to-rose-500',
-];
-
-function PromotionCard({ promo, index, onAction }: { promo: Promotion; index: number; onAction: (a: string | null) => void }) {
-  const gradient = CARD_GRADIENTS[index % CARD_GRADIENTS.length];
-  const badgeStyle = BADGE_STYLES[promo.badge_color] ?? 'bg-red-500 text-white';
+function TrustBar() {
+  const features = [
+    {
+      icon: Truck,
+      title: 'Livraison Express Glacée',
+      desc: 'Cotonou, Calavi & environs livrés sous 2h',
+    },
+    {
+      icon: Layers,
+      title: 'Tarifs Direct Dépôt',
+      desc: 'Prix de gros & demi-gros négociés brasserie',
+    },
+    {
+      icon: ShieldCheck,
+      title: 'Paiements Sécurisés Bénin',
+      desc: 'MTN MoMo, Moov Money et Cash à la livraison',
+    },
+    {
+      icon: RotateCcw,
+      title: 'Gestion des Consignes',
+      desc: 'Échange immédiat de vos casiers et bouteilles',
+    },
+  ];
 
   return (
-    <div
-      className="relative flex-shrink-0 w-72 sm:w-80 rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1.5 group cursor-pointer"
-      style={{ height: '200px' }}
-      onClick={() => onAction(promo.cta_action)}
-    >
-      {promo.image_url ? (
-        <>
-          <img src={promo.image_url} alt={promo.title}
-            className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-          <div className="absolute inset-0 bg-gradient-to-br from-black/70 via-black/40 to-black/20" />
-        </>
-      ) : (
-        <div className={`absolute inset-0 bg-gradient-to-br ${gradient}`} />
-      )}
-
-      {promo.badge_text && (
-        <span className={`absolute top-4 left-4 z-10 ${badgeStyle} text-xs font-black px-3 py-1.5 rounded-full shadow-lg tracking-wide`}>
-          {promo.badge_text}
-        </span>
-      )}
-
-      <div className="absolute inset-0 z-10 p-5 flex flex-col justify-end">
-        <p className="font-black text-white text-xl leading-tight drop-shadow-lg">{promo.title}</p>
-        {promo.subtitle && <p className="text-white/75 text-xs mt-1">{promo.subtitle}</p>}
-        {promo.ends_at && <div className="mt-2 text-white"><Countdown endsAt={promo.ends_at} /></div>}
-        {promo.cta_text && (
-          <div className="mt-3 inline-flex items-center gap-1.5 text-white text-xs font-semibold">
-            {promo.cta_text} <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 my-8">
+      {features.map(({ icon: Icon, title, desc }) => (
+        <div
+          key={title}
+          className="bg-white border border-[#E4E7ED] rounded-xl p-4 flex items-center gap-3.5 shadow-sm hover:shadow-md transition-shadow"
+        >
+          <div className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center flex-shrink-0">
+            <Icon className="w-6 h-6 text-[#D10024]" />
           </div>
-        )}
-      </div>
+          <div>
+            <p className="font-bold text-sm text-[#2B2D42]">{title}</p>
+            <p className="text-xs text-[#8D99AE]">{desc}</p>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
 
-// ─── Category product section (horizontal scroll row) ────────────────────────
+// ─── ELECTRO PRODUCT CARD ───────────────────────────────────────────────────
 
-function CategoryProductsSection({ category, products, onView, onAdd, onSeeAll }: {
-  category: Category;
-  products: Product[];
-  onView: (id: string) => void;
-  onAdd: (product: Product) => void;
-  onSeeAll: () => void;
-}) {
-  if (products.length === 0) return null;
-
-  return (
-    <section className="mb-14">
-      {/* Section header */}
-      <div className="flex items-end justify-between mb-4">
-        <div className="flex items-center gap-3">
-          {category.image_url && (
-            <div className="w-9 h-9 rounded-xl overflow-hidden flex-shrink-0 shadow-sm border border-brand-border">
-              <img src={category.image_url} alt={category.name} className="w-full h-full object-cover" />
-            </div>
-          )}
-          <div>
-            <h2 className="text-lg font-black text-brand-dark leading-tight">{category.name}</h2>
-            <p className="text-xs text-brand-muted">{products.length} produit{products.length !== 1 ? 's' : ''}</p>
-          </div>
-        </div>
-        <button
-          onClick={onSeeAll}
-          className="flex items-center gap-1 text-xs font-semibold text-brand-primary hover:text-brand-primary/80 transition group"
-        >
-          Voir tout
-          <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-        </button>
-      </div>
-
-      {/* Horizontal scroll on mobile, grid on desktop */}
-      <div className="relative">
-        <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 sm:overflow-visible sm:pb-0">
-          {products.slice(0, 6).map((product, i) => (
-            <div key={product.id} className="flex-shrink-0 w-[155px] sm:w-auto">
-              <StaggerItem index={i}>
-                <ProductCard
-                  product={product}
-                  onView={() => onView(product.id)}
-                  onAdd={() => onAdd(product)}
-                />
-              </StaggerItem>
-            </div>
-          ))}
-          {/* "See all" card when there are more than 6 products */}
-          {products.length > 6 && (
-            <div className="flex-shrink-0 w-[155px] sm:w-auto">
-              <button
-                onClick={onSeeAll}
-                className="w-full h-full min-h-[200px] rounded-xl border-2 border-dashed border-brand-border hover:border-brand-primary hover:bg-brand-primary/3 transition-all duration-200 flex flex-col items-center justify-center gap-2 group"
-              >
-                <div className="w-10 h-10 rounded-full bg-brand-primary/10 group-hover:bg-brand-primary/20 flex items-center justify-center transition-colors">
-                  <ArrowRight className="w-5 h-5 text-brand-primary" />
-                </div>
-                <span className="text-xs font-semibold text-brand-primary">
-                  +{products.length - 6} autres
-                </span>
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ─── Product card ─────────────────────────────────────────────────────────────
-
-export function ProductCard({ product, onView, onAdd }: {
+interface ProductCardProps {
   product: Product;
   onView: () => void;
-  onAdd: () => void;
-}) {
-  const isOutOfStock = product.track_stock && product.stock === 0;
-  const isLowStock = product.track_stock && product.stock > 0 && product.stock <= product.low_stock_threshold;
-  const isNew = Date.now() - new Date(product.created_at).getTime() < 7 * 24 * 60 * 60 * 1000;
-  const hasBulk = product.bulk_quantity > 0 && product.bulk_price > 0;
-  const [justAdded, setJustAdded] = useState(false);
-  const { toast } = useToast();
-  const ripple = useRipple();
-  const firstImage = parseImages(product.image_url)[0] ?? null;
+  onQuickView: (product: Product) => void;
+  onAdd: (product: Product) => void;
+}
 
-  function handleAdd(e: React.MouseEvent<HTMLButtonElement>) {
+function ElectroProductCard({ product, onView, onQuickView, onAdd }: ProductCardProps) {
+  const { isInWishlist, toggleWishlist } = useWishlist();
+  const { toast } = useToast();
+  const inWishlist = isInWishlist(product.id);
+
+  const hasDiscount = product.bulk_quantity > 0 && product.bulk_price > 0;
+  const isCrate = product.name.toLowerCase().includes('casier');
+
+  function handleShare(e: React.MouseEvent) {
     e.stopPropagation();
-    if (isOutOfStock) return;
-    ripple(e);
-    onAdd();
-    setJustAdded(true);
-    toast(`${product.name} ajouté au panier`, 'success');
-    setTimeout(() => setJustAdded(false), 1800);
+    const shareUrl = `${window.location.origin}?prod=${product.id}`;
+    if (navigator.share) {
+      navigator.share({
+        title: product.name,
+        text: `Découvrez ${product.name} sur SAFFO ONLINE - Dépôt de Brasserie au Bénin`,
+        url: shareUrl,
+      }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        toast('Lien du produit copié !', 'info');
+      }).catch(() => {});
+    }
+  }
+
+  function handleWishlistClick(e: React.MouseEvent) {
+    e.stopPropagation();
+    toggleWishlist(product.id);
+    toast(
+      inWishlist ? 'Retiré de vos favoris' : `${product.name} ajouté aux favoris`,
+      'info'
+    );
   }
 
   return (
-    <div className="group bg-white rounded-xl overflow-hidden cursor-pointer transition-all duration-300 hover:shadow-xl hover:-translate-y-0.5 border border-transparent hover:border-brand-border">
-      {/* Image zone */}
-      <div className="relative overflow-hidden bg-brand-surface" style={{ aspectRatio: '1/1' }}>
-        <button onClick={onView} className="block w-full h-full focus:outline-none">
-          {firstImage ? (
-            <img src={firstImage} alt={product.name}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-brand-border to-brand-surface">
-              <Package2 className="w-10 h-10 text-brand-muted/40" />
-            </div>
-          )}
+    <div className="group relative bg-white border border-[#E4E7ED] hover:border-[#D10024] rounded-lg p-3 sm:p-4 flex flex-col justify-between transition-all duration-200 hover:shadow-xl">
+      
+      {/* Top Badges */}
+      <div className="absolute top-3 left-3 z-20 flex flex-col gap-1 items-start">
+        {hasDiscount && (
+          <span className="bg-[#D10024] text-white text-[10px] font-extrabold uppercase px-2 py-0.5 rounded shadow-sm">
+            PROMO
+          </span>
+        )}
+        {isCrate && (
+          <span className="bg-[#FFB300] text-black text-[9px] font-bold uppercase px-1.5 py-0.5 rounded shadow-sm">
+            CASIER
+          </span>
+        )}
+      </div>
 
-          {/* Badges */}
-          <div className="absolute top-2 left-2 flex flex-col gap-1">
-            {isNew && !isOutOfStock && (
-              <span className="bg-brand-dark text-white text-[9px] font-black px-2 py-0.5 rounded-full tracking-wider uppercase">
-                New
-              </span>
-            )}
-            {hasBulk && (
-              <span className="bg-brand-success text-white text-[9px] font-black px-2 py-0.5 rounded-full">
-                Lot
+      {/* Quick Action Icons in top-right */}
+      <div className="absolute top-3 right-3 z-20 flex flex-col gap-1.5 opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+        <button
+          onClick={handleWishlistClick}
+          title="Ajouter aux favoris"
+          className={`w-7 h-7 rounded-full flex items-center justify-center shadow-md border border-gray-100 transition ${
+            inWishlist
+              ? 'bg-[#D10024] text-white'
+              : 'bg-white hover:bg-[#D10024] text-gray-700 hover:text-white'
+          }`}
+        >
+          <Heart className="w-3.5 h-3.5" fill={inWishlist ? 'currentColor' : 'none'} />
+        </button>
+
+        <button
+          onClick={(e) => { e.stopPropagation(); onQuickView(product); }}
+          title="Aperçu rapide"
+          className="w-7 h-7 rounded-full bg-white hover:bg-[#D10024] text-gray-700 hover:text-white flex items-center justify-center shadow-md border border-gray-100 transition"
+        >
+          <Eye className="w-3.5 h-3.5" />
+        </button>
+
+        <button
+          onClick={handleShare}
+          title="Partager"
+          className="w-7 h-7 rounded-full bg-white hover:bg-[#25D366] text-gray-700 hover:text-white flex items-center justify-center shadow-md border border-gray-100 transition"
+        >
+          <Share2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+
+      {/* Product Image */}
+      <div
+        onClick={onView}
+        className="w-full h-44 sm:h-48 overflow-hidden rounded-md cursor-pointer flex items-center justify-center p-2 mb-3 bg-[#FAF8F4]/50"
+      >
+        <img
+          src={product.image_url}
+          alt={product.name}
+          className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
+          onError={(e) => {
+            (e.target as HTMLImageElement).src = '/products/beninoise_65.jpg';
+          }}
+        />
+      </div>
+
+      {/* Product Details */}
+      <div className="flex-1 flex flex-col">
+        {/* Category uppercase */}
+        <p className="text-[10px] font-bold uppercase tracking-wider text-[#8D99AE] mb-1">
+          {product.category_id === 'cat-bieres'
+            ? 'BIÈRES & CASIERS'
+            : product.category_id === 'cat-vins-champagnes'
+            ? 'VINS & CHAMPAGNES'
+            : product.category_id === 'cat-spiritueux'
+            ? 'SPIRITUEUX'
+            : product.category_id === 'cat-softs-jus'
+            ? 'SOFTS & JUS'
+            : product.category_id === 'cat-eaux-glace'
+            ? 'EAUX & GLACE'
+            : 'PACK CÉRÉMONIE'}
+        </p>
+
+        {/* Product Title */}
+        <h4
+          onClick={onView}
+          className="text-xs sm:text-sm font-bold text-[#2B2D42] hover:text-[#D10024] cursor-pointer transition-colors leading-snug line-clamp-2 mb-2"
+        >
+          {product.name}
+        </h4>
+
+        {/* Star Rating */}
+        <div className="flex items-center gap-1 mb-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Star key={i} className="w-3 h-3 text-[#FFB300] fill-[#FFB300]" />
+          ))}
+          <span className="text-[10px] text-gray-400 ml-1">(5.0)</span>
+        </div>
+
+        {/* Price block */}
+        <div className="mt-auto pt-2">
+          <div className="flex items-baseline gap-2">
+            <span className="text-base sm:text-lg font-black text-[#D10024]">
+              {formatPrice(product.price)}
+            </span>
+            {hasDiscount && (
+              <span className="text-xs text-gray-400 line-through">
+                {formatPrice(Math.round(product.price * 1.12))}
               </span>
             )}
           </div>
 
-          {isLowStock && (
-            <span className="absolute top-2 right-2 bg-odoo-warning text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">
-              Stock: {product.stock}
-            </span>
-          )}
-
-          {isOutOfStock && (
-            <div className="absolute inset-0 bg-white/70 backdrop-blur-[2px] flex items-center justify-center">
-              <span className="bg-brand-dark text-white text-xs font-bold px-4 py-2 rounded-full">Rupture de stock</span>
-            </div>
-          )}
-        </button>
-
-        {/* Quick-add overlay — slides up on hover */}
-        {!isOutOfStock && (
-          <button
-            onClick={handleAdd}
-            className={`absolute inset-x-0 bottom-0 flex items-center justify-center gap-1.5 py-2.5 font-semibold text-xs
-              transition-all duration-300 ease-out
-              translate-y-full group-hover:translate-y-0
-              ${justAdded
-                ? 'bg-brand-success text-white'
-                : 'bg-brand-dark text-white hover:bg-brand-primary'
-              }`}
-          >
-            {justAdded
-              ? <><CheckCircle2 className="w-3.5 h-3.5" />Ajouté !</>
-              : <><ShoppingCart className="w-3.5 h-3.5" />Ajouter</>}
-          </button>
-        )}
-      </div>
-
-      {/* Text zone */}
-      <button onClick={onView} className="w-full text-left p-2.5 focus:outline-none">
-        <h3 className="font-semibold text-xs text-brand-dark line-clamp-2 leading-snug mb-1 group-hover:text-brand-primary transition-colors duration-200">
-          {product.name}
-        </h3>
-        <div className="flex items-baseline gap-1.5">
-          <span className="text-sm font-black text-brand-primary">{formatPrice(product.price)}</span>
-          {hasBulk && (
-            <span className="text-[11px] text-brand-muted line-through">{formatPrice(product.price)}</span>
+          {/* Wholesale notice */}
+          {hasDiscount && (
+            <p className="text-[10px] text-[#28A745] font-semibold mt-0.5">
+              Gros: {formatPrice(product.bulk_price)} dès {product.bulk_quantity} casiers
+            </p>
           )}
         </div>
-        {hasBulk && (
-          <p className="text-[11px] text-odoo-success font-semibold mt-0.5">
-            Lot: {formatPrice(product.bulk_price)} / unité
-          </p>
-        )}
+      </div>
+
+      {/* Add To Cart Button (Electro Pill Style) */}
+      <button
+        onClick={() => onAdd(product)}
+        className="mt-3.5 w-full btn-electro text-[11px] py-2 flex items-center justify-center gap-1.5"
+      >
+        <ShoppingCart className="w-3.5 h-3.5" />
+        <span>Ajouter au panier</span>
       </button>
     </div>
   );
 }
 
-// ─── Shop page ────────────────────────────────────────────────────────────────
+// ─── ELECTRO HOT DEAL THIS WEEK (Countdown Banner) ───────────────────────────
 
-export function ShopPage({ setView }: { setView: (v: View) => void }) {
-  const { settings } = useStoreSettings();
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [products, setProducts] = useState<Product[]>([]);
-  const [banners, setBanners] = useState<Banner[]>([]);
-  const [promotions, setPromotions] = useState<Promotion[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
-  const [activeSubcategory, setActiveSubcategory] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<'recent' | 'price-asc' | 'price-desc' | 'name'>('recent');
-  const [showFilters, setShowFilters] = useState(false);
+function HotDealBanner({ onSelectPack }: { onSelectPack: () => void }) {
+  const [timeLeft, setTimeLeft] = useState({ days: 2, hours: 14, minutes: 28, seconds: 45 });
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev.seconds > 0) return { ...prev, seconds: prev.seconds - 1 };
+        if (prev.minutes > 0) return { ...prev, minutes: 59, seconds: 59 };
+        if (prev.hours > 0) return { ...prev, hours: prev.hours - 1, minutes: 59, seconds: 59 };
+        if (prev.days > 0) return { ...prev, days: prev.days - 1, hours: 23, minutes: 59, seconds: 59 };
+        return { days: 3, hours: 12, minutes: 0, seconds: 0 };
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const pad = (n: number) => String(n).padStart(2, '0');
+
+  return (
+    <div className="relative rounded-2xl overflow-hidden my-12 bg-[#15161D] text-white shadow-2xl border border-[#2B2D42]">
+      {/* Background with overlay */}
+      <img
+        src="/banners/hot_deal_brewery.jpg"
+        alt="Hot Deal Brasserie"
+        className="absolute inset-0 w-full h-full object-cover opacity-35"
+      />
+      <div className="absolute inset-0 bg-gradient-to-r from-[#15161D] via-[#15161D]/90 to-transparent" />
+
+      <div className="relative z-10 px-6 sm:px-12 py-10 lg:py-14 max-w-4xl">
+        {/* Deal Badge */}
+        <div className="inline-flex items-center gap-2 bg-[#D10024] text-white text-xs font-black uppercase tracking-widest px-3.5 py-1 rounded-full mb-4">
+          <Clock className="w-3.5 h-3.5 animate-spin" />
+          <span>VENTE FLASH DU WEEK-END · BÉNIN</span>
+        </div>
+
+        {/* Headline */}
+        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-black text-white leading-tight mb-2">
+          PACK FESTIVAL BRASSERIE & MAQUIS
+        </h2>
+        <p className="text-white/80 text-xs sm:text-sm max-w-xl mb-6 leading-relaxed">
+          10 Casiers Béninoise 65cl + 3 Casiers Youki Cocktail + 2 Packs Possotomé + 2 Sacs de Glaçons 5kg offerts !
+          Idéal pour vos fêtes familiales, baptêmes ou réassort de bar à Cotonou et Calavi.
+        </p>
+
+        {/* Countdown timer circles (Signature Electro style) */}
+        <div className="flex items-center gap-3 sm:gap-4 mb-6">
+          {[
+            { label: 'Jours', val: timeLeft.days },
+            { label: 'Heures', val: pad(timeLeft.hours) },
+            { label: 'Mins', val: pad(timeLeft.minutes) },
+            { label: 'Secs', val: pad(timeLeft.seconds) },
+          ].map((item, idx) => (
+            <div
+              key={idx}
+              className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-[#1E1F29]/90 border border-white/15 flex flex-col items-center justify-center shadow-lg"
+            >
+              <span className="text-lg sm:text-2xl font-black text-[#D10024] font-mono leading-none">
+                {item.val}
+              </span>
+              <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-white/60 mt-0.5">
+                {item.label}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* Pricing + Action */}
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-baseline gap-2">
+            <span className="text-2xl sm:text-3xl font-black text-[#FFB300]">
+              89 000 FCFA
+            </span>
+            <span className="text-sm sm:text-base text-white/50 line-through">
+              105 000 FCFA
+            </span>
+          </div>
+
+          <button
+            onClick={onSelectPack}
+            className="btn-electro text-xs py-3 px-6 shadow-xl hover:scale-105"
+          >
+            Commander ce Pack Promo
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── ELECTRO TOP SELLING 3-COLUMN SHOWCASE ───────────────────────────────────
+
+function TopSellingColumns({
+  products,
+  onView,
+  onAdd,
+}: {
+  products: Product[];
+  onView: (id: string) => void;
+  onAdd: (product: Product) => void;
+}) {
+  const bieres = products.filter((p) => p.category_id === 'cat-bieres').slice(0, 3);
+  const vins = products.filter((p) => p.category_id === 'cat-vins-champagnes').slice(0, 3);
+  const softs = products.filter((p) => p.category_id === 'cat-softs-jus' || p.category_id === 'cat-eaux-glace').slice(0, 3);
+
+  const columns = [
+    { title: 'Top Bières & Casiers', list: bieres },
+    { title: 'Top Vins & Champagnes', list: vins },
+    { title: 'Top Softs & Eaux Minérales', list: softs },
+  ];
+
+  return (
+    <div className="my-12">
+      <div className="border-b-2 border-gray-200 pb-3 mb-6 flex items-center justify-between">
+        <h3 className="text-xl font-black uppercase text-[#2B2D42] relative after:content-[''] after:absolute after:-bottom-3.5 after:left-0 after:w-16 after:h-0.5 after:bg-[#D10024]">
+          Meilleures Ventes du Dépôt
+        </h3>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {columns.map((col, idx) => (
+          <div key={idx} className="bg-white border border-[#E4E7ED] rounded-xl p-4 shadow-sm">
+            <h4 className="font-extrabold text-sm text-[#2B2D42] uppercase tracking-wide border-b border-gray-100 pb-2 mb-3">
+              {col.title}
+            </h4>
+            <div className="space-y-3.5">
+              {col.list.map((p) => (
+                <div key={p.id} className="flex items-center gap-3 group">
+                  <div
+                    onClick={() => onView(p.id)}
+                    className="w-16 h-16 rounded-lg bg-gray-50 border border-gray-100 p-1 flex items-center justify-center flex-shrink-0 cursor-pointer overflow-hidden"
+                  >
+                    <img
+                      src={p.image_url}
+                      alt={p.name}
+                      className="w-full h-full object-contain group-hover:scale-105 transition-transform"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = '/products/beninoise_65.jpg';
+                      }}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p
+                      onClick={() => onView(p.id)}
+                      className="text-xs font-bold text-gray-800 hover:text-[#D10024] cursor-pointer truncate"
+                    >
+                      {p.name}
+                    </p>
+                    <div className="flex items-center gap-0.5 my-0.5">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <Star key={i} className="w-2.5 h-2.5 text-[#FFB300] fill-[#FFB300]" />
+                      ))}
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-[#D10024]">
+                        {formatPrice(p.price)}
+                      </span>
+                      <button
+                        onClick={() => onAdd(p)}
+                        className="p-1 text-gray-400 hover:text-[#D10024] transition"
+                        title="Ajouter au panier"
+                      >
+                        <ShoppingCart className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── GUIDE CONSIGNES CASIERS & VENTE EN GROS (Bénin Context) ──────────────────
+
+function ConsignesGuideSection({ whatsappNumber }: { whatsappNumber: string }) {
+  const cleanWhatsapp = whatsappNumber.replace(/\D/g, '');
+
+  return (
+    <div className="bg-white border border-[#E4E7ED] rounded-2xl p-6 sm:p-8 my-12 shadow-sm">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+        <div>
+          <span className="text-xs font-extrabold uppercase tracking-widest text-[#D10024] mb-2 block">
+            Guide Pratique Dépôt au Bénin
+          </span>
+          <h3 className="text-2xl sm:text-3xl font-black text-[#2B2D42] leading-tight mb-3">
+            Comment fonctionne le système des consignes de casiers ?
+          </h3>
+          <p className="text-xs sm:text-sm text-[#8D99AE] leading-relaxed mb-6">
+            Pour vos maquis, bars ou réceptions à Cotonou et Calavi, nous appliquons le barème officiel des emballages consignés Sobebra. Deux options s'offrent à vous :
+          </p>
+
+          <div className="space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="w-7 h-7 rounded-full bg-red-100 text-[#D10024] font-bold text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
+                1
+              </div>
+              <div>
+                <p className="text-xs font-bold text-gray-900">Vous avez déjà des casiers vides (Échange direct)</p>
+                <p className="text-xs text-gray-500">
+                  À la livraison, notre chauffeur reprend vos casiers vides (12 ou 24 bouteilles) et décharge vos casiers pleins. Vous ne payez que le prix de la boisson.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="w-7 h-7 rounded-full bg-red-100 text-[#D10024] font-bold text-xs flex items-center justify-center flex-shrink-0 mt-0.5">
+                2
+              </div>
+              <div>
+                <p className="text-xs font-bold text-gray-900">Premier achat ou sans emballages vides</p>
+                <p className="text-xs text-gray-500">
+                  Une consigne officielle est facturée pour le casier et les bouteilles en verre. Elle vous est intégralement remboursée dès retour des emballages au dépôt.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* WhatsApp Quote Card */}
+        <div className="bg-[#15161D] text-white rounded-xl p-6 border border-[#2B2D42] shadow-xl text-center space-y-4">
+          <div className="w-12 h-12 rounded-full bg-[#25D366]/20 text-[#25D366] flex items-center justify-center mx-auto">
+            <IconWhatsapp className="w-6 h-6" />
+          </div>
+          <h4 className="text-xl font-bold">Besoin d'un devis pour un événement ?</h4>
+          <p className="text-xs text-white/70 max-w-sm mx-auto leading-relaxed">
+            Mariage, dot, baptême, funérailles ou soirée maquis ? Écrivez-nous pour un chiffrage personnalisé avec estimation exacte du cubage et reprise des invendus.
+          </p>
+          <a
+            href={`https://wa.me/${cleanWhatsapp}?text=${encodeURIComponent(
+              'Bonjour Saffo Online, je souhaite un devis gratuit pour mon événement (nombre d\'invités, date, lieu).'
+            )}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 bg-[#25D366] hover:bg-[#20ba59] text-white font-bold text-xs uppercase tracking-wider px-6 py-3 rounded-full transition shadow-lg"
+          >
+            <IconWhatsapp className="w-4 h-4" />
+            <span>Demander un devis WhatsApp</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── TESTIMONIALS SECTION (Social proof in Benin) ───────────────────────────
+
+function TestimonialsSection() {
+  return (
+    <div className="my-12">
+      <div className="text-center mb-8">
+        <span className="text-xs font-bold uppercase tracking-widest text-[#D10024]">
+          Confiance & Partenariats
+        </span>
+        <h3 className="text-2xl font-black text-[#2B2D42]">
+          Ce que disent nos clients et gérants de maquis au Bénin
+        </h3>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {DEFAULT_TESTIMONIALS.map((t) => (
+          <div
+            key={t.id}
+            className="bg-white border border-[#E4E7ED] rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between"
+          >
+            <div>
+              <div className="flex items-center gap-1 mb-3">
+                {Array.from({ length: t.rating }).map((_, i) => (
+                  <Star key={i} className="w-3.5 h-3.5 text-[#FFB300] fill-[#FFB300]" />
+                ))}
+              </div>
+              <p className="text-xs text-gray-600 italic leading-relaxed mb-4">
+                « {t.comment} »
+              </p>
+            </div>
+            <div className="flex items-center gap-3 pt-3 border-t border-gray-100">
+              <img
+                src={t.avatar}
+                alt={t.name}
+                className="w-10 h-10 rounded-full object-cover border border-gray-200"
+              />
+              <div>
+                <p className="text-xs font-bold text-gray-900">{t.name}</p>
+                <p className="text-[11px] text-gray-500">{t.role}</p>
+                <p className="text-[10px] text-[#D10024] font-medium">{t.location}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── NEWSLETTER / ALERTE PROMO SECTION ──────────────────────────────────────
+
+function NewsletterSection() {
+  const [email, setEmail] = useState('');
+  const [subscribed, setSubscribed] = useState(false);
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setSubscribed(true);
+  }
+
+  return (
+    <div className="bg-[#15161D] text-white rounded-2xl p-6 sm:p-10 my-12 border border-[#2B2D42] text-center shadow-xl">
+      <div className="max-w-xl mx-auto space-y-3">
+        <div className="w-10 h-10 rounded-full bg-red-600/20 text-[#D10024] flex items-center justify-center mx-auto">
+          <Sparkles className="w-5 h-5" />
+        </div>
+        <h3 className="text-xl sm:text-2xl font-black uppercase">
+          Recevez nos Tarifs & Promotions Brasserie
+        </h3>
+        <p className="text-xs text-white/70">
+          Soyez averti des arrivages de casiers frais de Béninoise, des remises week-end et des offres spéciales maquis à Cotonou.
+        </p>
+
+        {subscribed ? (
+          <div className="p-3 bg-green-900/40 border border-green-500 text-green-300 text-xs rounded-lg font-medium">
+            Merci ! Vous êtes bien inscrit aux alertes promo de SAFFO ONLINE.
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2 max-w-md mx-auto pt-2">
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Votre adresse email..."
+              className="flex-1 bg-white text-gray-900 placeholder-gray-400 text-xs px-4 py-3 rounded-full focus:outline-none"
+              required
+            />
+            <button type="submit" className="btn-electro text-xs py-3 px-6 rounded-full flex-shrink-0">
+              S'inscrire
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── QUICK VIEW MODAL (Interactive Preview) ──────────────────────────────────
+
+function QuickViewModal({
+  product,
+  onClose,
+  onAdd,
+  onViewProduct,
+  whatsappNumber,
+}: {
+  product: Product;
+  onClose: () => void;
+  onAdd: (product: Product, quantity: number) => void;
+  onViewProduct: (id: string) => void;
+  whatsappNumber: string;
+}) {
+  const [qty, setQty] = useState(1);
+  const cleanWhatsapp = whatsappNumber.replace(/\D/g, '');
+
+  const hasBulk = product.bulk_quantity > 0 && product.bulk_price > 0;
+  const isBulkActive = hasBulk && qty >= product.bulk_quantity;
+  const currentUnitPrice = isBulkActive ? product.bulk_price : product.price;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in-scale">
+      <div className="relative bg-white text-gray-800 rounded-2xl max-w-2xl w-full p-6 sm:p-8 shadow-2xl border border-gray-100 max-h-[90vh] overflow-y-auto">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 p-1.5 text-gray-400 hover:text-gray-700 rounded-full hover:bg-gray-100"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center">
+          <div className="bg-gray-50 rounded-xl p-4 flex items-center justify-center h-64 border border-gray-100">
+            <img
+              src={product.image_url}
+              alt={product.name}
+              className="max-h-56 max-w-full object-contain"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = '/products/beninoise_65.jpg';
+              }}
+            />
+          </div>
+
+          <div className="space-y-3">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#D10024] bg-red-50 px-2.5 py-0.5 rounded">
+              SKU: {product.sku || 'BRASSERIE-BJ'}
+            </span>
+
+            <h3 className="text-lg font-black text-gray-900 leading-tight">
+              {product.name}
+            </h3>
+
+            <div className="flex items-center gap-1">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Star key={i} className="w-3.5 h-3.5 text-[#FFB300] fill-[#FFB300]" />
+              ))}
+              <span className="text-xs text-gray-400 ml-1">(Avis certifiés)</span>
+            </div>
+
+            <div className="flex items-baseline gap-2 pt-1">
+              <span className="text-2xl font-black text-[#D10024]">
+                {formatPrice(currentUnitPrice)}
+              </span>
+              {hasBulk && !isBulkActive && (
+                <span className="text-xs text-gray-400 line-through">
+                  {formatPrice(Math.round(product.price * 1.1))}
+                </span>
+              )}
+            </div>
+
+            {hasBulk && (
+              <div className="p-2.5 bg-yellow-50 border border-yellow-200 rounded-lg text-xs text-yellow-800">
+                <span className="font-bold">Tarif de gros :</span> {formatPrice(product.bulk_price)} l'unité dès {product.bulk_quantity} casiers commandés !
+              </div>
+            )}
+
+            <p className="text-xs text-gray-600 leading-relaxed">
+              {product.description}
+            </p>
+
+            {/* Quantity Selector + Add to Cart */}
+            <div className="pt-2 space-y-3">
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-bold text-gray-700">Quantité :</span>
+                <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
+                  <button
+                    onClick={() => setQty((q) => Math.max(1, q - 1))}
+                    className="px-3 py-1 bg-gray-100 hover:bg-gray-200 font-bold"
+                  >
+                    -
+                  </button>
+                  <span className="px-4 py-1 text-xs font-bold">{qty}</span>
+                  <button
+                    onClick={() => setQty((q) => q + 1)}
+                    className="px-3 py-1 bg-gray-100 hover:bg-gray-200 font-bold"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    onAdd(product, qty);
+                    onClose();
+                  }}
+                  className="btn-electro flex-1 text-xs py-2.5"
+                >
+                  <ShoppingCart className="w-4 h-4" />
+                  <span>Ajouter ({formatPrice(currentUnitPrice * qty)})</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    onClose();
+                    onViewProduct(product.id);
+                  }}
+                  className="btn-electro-outline text-xs px-4 py-2.5"
+                >
+                  Détails
+                </button>
+              </div>
+
+              {/* WhatsApp direct info */}
+              <a
+                href={`https://wa.me/${cleanWhatsapp}?text=${encodeURIComponent(
+                  `Bonjour, je souhaite commander ${qty}x ${product.name}`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-1.5 text-xs text-[#25D366] font-bold hover:underline pt-1"
+              >
+                <IconWhatsapp className="w-3.5 h-3.5" />
+                <span>Poser une question sur WhatsApp</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── MAIN SHOP PAGE ─────────────────────────────────────────────────────────
+
+interface ShopPageProps {
+  setView: (v: View) => void;
+  initialCategoryId?: string;
+  initialSearch?: string;
+}
+
+export function ShopPage({ setView, initialCategoryId, initialSearch }: ShopPageProps) {
   const { addToCart } = useCart();
+  const { toast } = useToast();
+  const { settings } = useStoreSettings();
+
+  const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
+  const [products, setProducts] = useState<Product[]>(DEFAULT_PRODUCTS);
+  const [banners, setBanners] = useState<Banner[]>(DEFAULT_BANNERS);
+  const [publications, setPublications] = useState<Publication[]>(DEFAULT_PUBLICATIONS);
+
+  // Filters & State
+  const [activeCategory, setActiveCategory] = useState<string | null>(initialCategoryId ?? null);
+  const [search, setSearch] = useState(initialSearch ?? '');
+  const [sortBy, setSortBy] = useState<'recent' | 'price-asc' | 'price-desc' | 'name'>('recent');
+  const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
+
   const productsSectionRef = useRef<HTMLDivElement>(null);
 
+  // Sync initial props
+  useEffect(() => {
+    if (initialCategoryId !== undefined) setActiveCategory(initialCategoryId);
+  }, [initialCategoryId]);
+
+  useEffect(() => {
+    if (initialSearch !== undefined) setSearch(initialSearch);
+  }, [initialSearch]);
+
+  // Load Supabase or fallback data
   useEffect(() => {
     let mounted = true;
     Promise.all([
       supabase.from('categories').select('*').order('sort_order'),
       supabase.from('products').select('*').eq('is_active', true).order('name', { ascending: true }),
       supabase.from('banners').select('*').eq('is_active', true).order('sort_order').order('created_at'),
-      supabase.from('promotions').select('*').eq('is_active', true)
-        .or('ends_at.is.null,ends_at.gt.' + new Date().toISOString())
-        .order('sort_order').order('created_at'),
-    ]).then(([cats, prods, bnrs, promos]) => {
-      if (!mounted) return;
-      setCategories((cats.data as Category[]) ?? []);
-      setProducts((prods.data as Product[]) ?? []);
-      setBanners((bnrs.data as Banner[]) ?? []);
-      setPromotions((promos.data as Promotion[]) ?? []);
-      setLoading(false);
-    });
-    return () => { mounted = false; };
+      supabase.from('publications').select('*').eq('active', true).order('created_at', { ascending: false }).limit(6),
+    ])
+      .then(([cats, prods, bnrs, pubs]) => {
+        if (!mounted) return;
+        if (cats.data && cats.data.length > 0) setCategories(cats.data as Category[]);
+        if (prods.data && prods.data.length > 0) setProducts(prods.data as Product[]);
+        if (bnrs.data && bnrs.data.length > 0) setBanners(bnrs.data as Banner[]);
+        if (pubs.data && pubs.data.length > 0) setPublications(pubs.data as Publication[]);
+      })
+      .catch(() => {
+        if (!mounted) return;
+      });
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
-  function handleCTA(action: string | null) {
-    if (!action || action === 'shop') {
+  const whatsappNumber = settings.whatsapp_number || '+229 97 20 40 60';
+
+  function handleBannerAction(catId: string | null) {
+    if (!catId || catId === 'shop') {
       productsSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
       return;
     }
-    if (action.startsWith('http')) {
-      window.open(action, '_blank', 'noopener,noreferrer');
-    } else {
-      setActiveCategory(action);
-      productsSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
+    setActiveCategory(catId);
+    productsSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
   }
 
+  function handleAddToCart(product: Product, quantity = 1) {
+    addToCart(product, quantity);
+    toast(`${product.name} × ${quantity} ajouté au panier !`, 'success');
+  }
+
+  // Filtered Products
   const filtered = useMemo(() => {
     let list = [...products];
-    if (activeSubcategory) {
-      list = list.filter((p) => p.category_id === activeSubcategory);
-    } else if (activeCategory) {
+
+    if (activeCategory) {
       const childIds = categories.filter((c) => c.parent_id === activeCategory).map((c) => c.id);
-      list = list.filter((p) => p.category_id === activeCategory || childIds.includes(p.category_id));
+      list = list.filter((p) => p.category_id === activeCategory || (p.category_id ? childIds.includes(p.category_id) : false));
     }
+
     if (search.trim()) {
       const q = search.toLowerCase();
-      list = list.filter((p) => p.name.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q));
+      list = list.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          p.description?.toLowerCase().includes(q) ||
+          (p.sku && p.sku.toLowerCase().includes(q))
+      );
     }
+
     if (sortBy === 'price-asc') list.sort((a, b) => a.price - b.price);
     else if (sortBy === 'price-desc') list.sort((a, b) => b.price - a.price);
     else if (sortBy === 'name') list.sort((a, b) => a.name.localeCompare(b.name));
+
     return list;
-  }, [products, categories, activeCategory, activeSubcategory, search, sortBy]);
+  }, [products, categories, activeCategory, search, sortBy]);
 
   const activeCategoryName = activeCategory
     ? categories.find((c) => c.id === activeCategory)?.name
     : null;
-  const activeSubcategoryName = activeSubcategory
-    ? categories.find((c) => c.id === activeSubcategory)?.name
-    : null;
-  const subcategories = activeCategory
-    ? categories.filter((c) => c.parent_id === activeCategory)
-    : [];
 
   return (
-    <div className="page-enter bg-white min-h-screen">
+    <div className="max-w-7xl mx-auto px-4 lg:px-6 py-4">
 
-      {/* ── Banner ────────────────────────────────────────────────────────── */}
-      {loading ? (
-        <div className="w-full bg-gradient-to-r from-brand-border/40 to-brand-border/20 animate-pulse"
-          style={{ height: 'clamp(320px, 62vh, 680px)' }} />
-      ) : banners.length > 0 ? (
-        <BannerCarousel banners={banners} onAction={handleCTA} />
-      ) : settings.hero_style === 'none' ? (
-        /* No hero — minimal mode */
-        null
-      ) : (
-        /* Fallback hero */
-        <div className="relative overflow-hidden bg-brand-dark" style={{ height: 'clamp(320px, 62vh, 680px)' }}>
-          <div className="absolute inset-0 bg-gradient-to-br from-brand-primary via-brand-dark to-black opacity-90" />
-          <div className="absolute top-0 right-0 w-96 h-96 -mr-32 -mt-32 rounded-full bg-brand-accent/10 blur-3xl" />
-          <div className="absolute bottom-0 left-0 w-64 h-64 -ml-16 -mb-16 rounded-full bg-brand-accent/10 blur-2xl" />
-          <div className="absolute inset-0 flex items-center">
-            <div className="max-w-7xl mx-auto w-full px-6 lg:px-12">
-              <p className="text-brand-accent text-xs font-bold tracking-widest uppercase mb-4">Grossiste en boissons · Bénin</p>
-              <h1 className="text-5xl lg:text-7xl font-black text-white leading-none mb-6">
-                Boissons fraîches<br /><span className="text-brand-accent">en gros & au détail.</span>
-              </h1>
-              <p className="text-white/60 text-lg max-w-md leading-relaxed mb-8">
-                Bières, sodas, jus et eaux — prix dégressifs par carton, livraison rapide sur Cotonou et tout le Bénin.
-              </p>
-              <button onClick={() => productsSectionRef.current?.scrollIntoView({ behavior: 'smooth' })}
-                className="group inline-flex items-center gap-3 bg-brand-accent text-brand-dark font-bold px-8 py-4 rounded-full hover:bg-brand-accent-dark transition-all duration-300 shadow-accent text-sm">
-                Voir le catalogue <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+      {/* ── 1. DYNAMIC HERO CAROUSEL BANNER ───────────────────────────────── */}
+      <section className="mb-6">
+        <DynamicBreweryCarousel
+          banners={banners}
+          onAction={handleBannerAction}
+          whatsappNumber={whatsappNumber}
+        />
+      </section>
+
+      {/* ── 2. ELECTRO 3-COLUMN COLLECTION TILES ──────────────────────────── */}
+      <section>
+        <ElectroCollectionTiles onSelect={handleBannerAction} />
+      </section>
+
+      {/* ── 3. TRUST & VALUE BAR ──────────────────────────────────────────── */}
+      <section>
+        <TrustBar />
+      </section>
+
+      {/* ── 4. ELECTRO TABBED PRODUCTS SECTION ("NOUVEAUX ARRIVAGES") ──────── */}
+      <section ref={productsSectionRef} className="my-10 scroll-mt-24">
+        
+        {/* Section Header with Electro Category Tabs */}
+        <div className="border-b-2 border-gray-200 pb-2 mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-black uppercase text-[#2B2D42] relative after:content-[''] after:absolute after:-bottom-2.5 after:left-0 after:w-20 after:h-0.5 after:bg-[#D10024]">
+              {activeCategoryName ? activeCategoryName : search ? `Recherche : "${search}"` : 'Nouveaux Arrivages'}
+            </h2>
+            <p className="text-xs text-[#8D99AE] mt-2">
+              Bière, vin, champagne, softs et glaçons prêts pour livraison à Cotonou & Calavi.
+            </p>
+          </div>
+
+          {/* Electro Category Tabs */}
+          <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto scrollbar-hide py-1">
+            <button
+              onClick={() => { setActiveCategory(null); setSearch(''); }}
+              className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase transition whitespace-nowrap ${
+                !activeCategory && !search
+                  ? 'bg-[#D10024] text-white shadow-sm'
+                  : 'bg-white text-gray-700 hover:text-[#D10024] border border-gray-200'
+              }`}
+            >
+              Tous
+            </button>
+            {categories.filter((c) => !c.parent_id).map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => { setActiveCategory(cat.id); setSearch(''); }}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold uppercase transition whitespace-nowrap ${
+                  activeCategory === cat.id
+                    ? 'bg-[#D10024] text-white shadow-sm'
+                    : 'bg-white text-gray-700 hover:text-[#D10024] border border-gray-200'
+                }`}
+              >
+                {cat.name}
               </button>
-            </div>
+            ))}
           </div>
         </div>
-      )}
 
-      {/* ── Content ───────────────────────────────────────────────────────── */}
-      <div className="max-w-7xl mx-auto px-4 lg:px-6">
+        {/* Filter controls & Count bar */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6 bg-white p-3 rounded-xl border border-gray-200">
+          <div className="text-xs text-gray-500 font-medium">
+            Affichage de <span className="font-bold text-[#D10024]">{filtered.length}</span> produit{filtered.length > 1 ? 's' : ''} disponible{filtered.length > 1 ? 's' : ''}
+          </div>
 
-        {/* Trust bar */}
-        <TrustBar />
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-gray-500 uppercase">Trier :</span>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as any)}
+              className="text-xs bg-gray-50 border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none cursor-pointer"
+            >
+              <option value="recent">Plus récents</option>
+              <option value="price-asc">Prix : Croissant</option>
+              <option value="price-desc">Prix : Décroissant</option>
+              <option value="name">Nom : A - Z</option>
+            </select>
 
-        {/* Publications */}
-        {!activeCategory && !search && <PublicationsSection />}
-
-        {/* Categories */}
-        {!activeCategory && !search && (
-          <CategorySection categories={categories} products={products} onSelect={(id) => {
-            setActiveCategory(id);
-            productsSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
-          }} />
-        )}
-
-        {/* Promotions */}
-        {promotions.length > 0 && !activeCategory && !search && (
-          <section className="mb-12">
-            <div className="flex items-end justify-between mb-6">
-              <div>
-                <p className="text-xs font-semibold tracking-widest text-brand-accent uppercase mb-1">Disponible maintenant</p>
-                <h2 className="text-2xl lg:text-3xl font-black text-brand-dark flex items-center gap-2">
-                  <Flame className="w-7 h-7 text-brand-accent" />
-                  Promos du moment
-                </h2>
-              </div>
-            </div>
-            <div className="flex gap-4 overflow-x-auto scrollbar-hide pb-2 -mx-1 px-1">
-              {promotions.map((promo, i) => (
-                <PromotionCard key={promo.id} promo={promo} index={i} onAction={handleCTA} />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* Products section */}
-        <section ref={productsSectionRef} className="pb-16">
-
-          {/* Section heading */}
-          <div className="flex items-end justify-between mb-6">
-            <div>
-              {activeSubcategoryName ? (
-                <>
-                  <p className="text-xs font-semibold tracking-widest text-brand-primary uppercase mb-1">{activeCategoryName}</p>
-                  <h2 className="text-2xl lg:text-3xl font-black text-brand-dark">{activeSubcategoryName}</h2>
-                </>
-              ) : activeCategoryName ? (
-                <>
-                  <p className="text-xs font-semibold tracking-widest text-brand-primary uppercase mb-1">Catégorie</p>
-                  <h2 className="text-2xl lg:text-3xl font-black text-brand-dark">{activeCategoryName}</h2>
-                </>
-              ) : search ? (
-                <>
-                  <p className="text-xs font-semibold tracking-widest text-brand-muted uppercase mb-1">Résultats</p>
-                  <h2 className="text-2xl lg:text-3xl font-black text-brand-dark">"{search}"</h2>
-                </>
-              ) : (
-                <>
-                  <p className="text-xs font-semibold tracking-widest text-brand-primary uppercase mb-1">Catalogue</p>
-                  <h2 className="text-2xl lg:text-3xl font-black text-brand-dark">Tous les produits</h2>
-                </>
-              )}
-            </div>
-            {(activeCategoryName || search) && (
+            {(activeCategory || search) && (
               <button
-                onClick={() => { setActiveCategory(null); setActiveSubcategory(null); setSearch(''); }}
-                className="flex items-center gap-1.5 text-sm text-brand-muted hover:text-odoo-danger transition-colors">
-                <X className="w-4 h-4" />Effacer
+                onClick={() => { setActiveCategory(null); setSearch(''); }}
+                className="flex items-center gap-1 text-xs text-[#D10024] font-bold hover:underline ml-2"
+              >
+                <X className="w-3.5 h-3.5" />
+                Effacer
               </button>
             )}
           </div>
+        </div>
 
-          {/* Subcategory chips */}
-          {subcategories.length > 0 && !activeSubcategory && (
-            <div className="flex flex-wrap gap-2 mb-5">
-              {subcategories.map((sub) => {
-                const count = products.filter((p) => p.category_id === sub.id).length;
-                return (
-                  <button key={sub.id} onClick={() => setActiveSubcategory(sub.id)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-brand-border hover:border-brand-primary hover:text-brand-primary transition">
-                    {sub.name} <span className="text-brand-muted">({count})</span>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          {activeSubcategory && (
-            <button onClick={() => setActiveSubcategory(null)} className="flex items-center gap-1.5 text-sm text-brand-muted hover:text-brand-primary transition mb-5">
-              <ArrowLeft className="w-4 h-4" />Toutes les sous-catégories
-            </button>
-          )}
-
-          {/* Search + filter bar */}
-          <div className="flex gap-2 mb-6">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-brand-muted pointer-events-none" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Rechercher une boisson..."
-                className="w-full pl-11 pr-4 py-3 border border-brand-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-odoo-primary/30 focus:border-odoo-primary transition bg-white shadow-sm"
-              />
-            </div>
+        {/* Product Grid */}
+        {filtered.length === 0 ? (
+          <div className="text-center py-20 bg-white rounded-2xl border border-gray-200 p-8">
+            <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+            <h3 className="text-lg font-bold text-gray-800 mb-1">Aucune boisson trouvée</h3>
+            <p className="text-xs text-gray-500 mb-4">
+              Essayez un autre mot-clé ou parcourez nos rayons ci-dessus.
+            </p>
             <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-2 px-4 py-3 rounded-xl border text-sm font-medium transition shadow-sm ${
-                showFilters ? 'bg-brand-primary text-white border-odoo-primary' : 'bg-white border-brand-border hover:border-odoo-primary text-brand-dark'
-              }`}>
-              <SlidersHorizontal className="w-4 h-4" />
-              <span className="hidden sm:inline">Filtres</span>
+              onClick={() => { setActiveCategory(null); setSearch(''); }}
+              className="btn-electro text-xs"
+            >
+              Voir tout le catalogue
             </button>
           </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {filtered.map((prod) => (
+              <ElectroProductCard
+                key={prod.id}
+                product={prod}
+                onView={() => setView({ kind: 'product', id: prod.id })}
+                onQuickView={(p) => setQuickViewProduct(p)}
+                onAdd={(p) => handleAddToCart(p, 1)}
+              />
+            ))}
+          </div>
+        )}
+      </section>
 
-          {/* Expanded filters */}
-          {showFilters && (
-            <div className="flex flex-wrap gap-3 mb-6 p-4 bg-brand-surface rounded-xl border border-brand-border animate-fade-in-up">
-              {/* Sort */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-brand-muted uppercase tracking-wide">Trier :</span>
-                {(['recent', 'price-asc', 'price-desc', 'name'] as const).map((s) => (
-                  <button key={s} onClick={() => setSortBy(s)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${sortBy === s ? 'bg-brand-primary text-white' : 'bg-white border border-brand-border hover:border-odoo-primary'}`}>
-                    {{ recent: 'Récents', 'price-asc': 'Prix ↑', 'price-desc': 'Prix ↓', name: 'A-Z' }[s]}
-                  </button>
-                ))}
-              </div>
-              {/* Category filter */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-semibold text-brand-muted uppercase tracking-wide">Rayon :</span>
-                <button onClick={() => setActiveCategory(null)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${!activeCategory ? 'bg-brand-primary text-white' : 'bg-white border border-brand-border hover:border-odoo-primary'}`}>
-                  Tout
-                </button>
-                {categories.filter((c) => !c.parent_id).map((cat) => (
-                  <button key={cat.id} onClick={() => { setActiveCategory(cat.id); setActiveSubcategory(null); }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition ${activeCategory === cat.id ? 'bg-brand-primary text-white' : 'bg-white border border-brand-border hover:border-odoo-primary'}`}>
-                    {cat.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
+      {/* ── 5. ELECTRO "HOT DEAL THIS WEEK" COUNTDOWN BANNER ──────────────── */}
+      <section>
+        <HotDealBanner
+          onSelectPack={() => {
+            const packProd = products.find((p) => p.id === 'prod-pack-dot-mariage') || products[0];
+            if (packProd) handleAddToCart(packProd, 1);
+          }}
+        />
+      </section>
 
-          {/* Result count — only when filtering */}
-          {!loading && (activeCategory || search) && (
-            <p className="text-sm text-brand-muted mb-4">
-              <span className="font-bold text-brand-dark">{filtered.length}</span> produit{filtered.length !== 1 ? 's' : ''} trouvé{filtered.length !== 1 ? 's' : ''}
-            </p>
-          )}
+      {/* ── 6. ELECTRO TOP SELLING MICRO-COLUMNS ───────────────────────────── */}
+      <section>
+        <TopSellingColumns
+          products={products}
+          onView={(id) => setView({ kind: 'product', id })}
+          onAdd={(p) => handleAddToCart(p, 1)}
+        />
+      </section>
 
-          {/* ── Unfiltered: products split by category ─────────────────────── */}
-          {loading ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-              {Array.from({ length: 12 }).map((_, i) => <SkeletonCard key={i} />)}
-            </div>
-          ) : !activeCategory && !search ? (
-            (() => {
-              const rootCats = categories.filter((c) => !c.parent_id);
-              const allChildIds = new Set(categories.filter((c) => c.parent_id).map((c) => c.id));
-              const sectionsToShow = rootCats
-                .map((cat) => {
-                  const childIds = categories.filter((c) => c.parent_id === cat.id).map((c) => c.id);
-                  const catProducts = filtered.filter(
-                    (p) => p.category_id === cat.id || childIds.includes(p.category_id ?? ''),
-                  );
-                  return { cat, catProducts };
-                })
-                .filter(({ catProducts }) => catProducts.length > 0);
-              // Products not assigned to any root category
-              const uncategorised = filtered.filter(
-                (p) => !p.category_id || allChildIds.has(p.category_id)
-                  ? false
-                  : !rootCats.some((rc) => {
-                      const childIds = categories.filter((c) => c.parent_id === rc.id).map((c) => c.id);
-                      return p.category_id === rc.id || childIds.includes(p.category_id ?? '');
-                    }),
-              );
-              return (
-                <>
-                  {sectionsToShow.map(({ cat, catProducts }) => (
-                    <CategoryProductsSection
-                      key={cat.id}
-                      category={cat}
-                      products={catProducts}
-                      onView={(id) => setView({ kind: 'product', id })}
-                      onAdd={(product) => addToCart(product)}
-                      onSeeAll={() => { setActiveCategory(cat.id); setActiveSubcategory(null); productsSectionRef.current?.scrollIntoView({ behavior: 'smooth' }); }}
-                    />
-                  ))}
-                  {uncategorised.length > 0 && (
-                    <section className="mb-14">
-                      <div className="flex items-end justify-between mb-4">
-                        <div>
-                          <h2 className="text-lg font-black text-brand-dark">Autres produits</h2>
-                          <p className="text-xs text-brand-muted">{uncategorised.length} produit{uncategorised.length !== 1 ? 's' : ''}</p>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                        {uncategorised.map((product, i) => (
-                          <StaggerItem key={product.id} index={i % 8}>
-                            <ProductCard
-                              product={product}
-                              onView={() => setView({ kind: 'product', id: product.id })}
-                              onAdd={() => addToCart(product)}
-                            />
-                          </StaggerItem>
-                        ))}
-                      </div>
-                    </section>
-                  )}
-                  {sectionsToShow.length === 0 && uncategorised.length === 0 && (
-                    <div className="text-center py-24">
-                      <div className="w-20 h-20 bg-brand-surface rounded-full flex items-center justify-center mx-auto mb-5">
-                        <AlertCircle className="w-9 h-9 text-brand-muted" />
-                      </div>
-                      <p className="text-lg font-bold mb-2">Catalogue vide</p>
-                      <p className="text-sm text-brand-muted">Aucune boisson disponible pour le moment</p>
-                    </div>
-                  )}
-                </>
-              );
-            })()
-          ) : filtered.length === 0 ? (
-            <div className="text-center py-24 animate-fade-in-scale">
-              <div className="w-20 h-20 bg-brand-surface rounded-full flex items-center justify-center mx-auto mb-5">
-                <AlertCircle className="w-9 h-9 text-brand-muted" />
-              </div>
-              <p className="text-lg font-bold mb-2">Aucun résultat</p>
-              <p className="text-sm text-brand-muted">Essayez d'autres termes ou explorez toutes les catégories</p>
-              <button onClick={() => { setActiveCategory(null); setSearch(''); }}
-                className="mt-6 inline-flex items-center gap-2 bg-brand-primary text-white px-6 py-2.5 rounded-full font-medium text-sm hover:bg-brand-primary-dark transition">
-                Voir tout le catalogue
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-              {filtered.map((product, i) => (
-                <StaggerItem key={product.id} index={i % 8}>
-                  <ProductCard
-                    product={product}
-                    onView={() => setView({ kind: 'product', id: product.id })}
-                    onAdd={() => addToCart(product)}
+      {/* ── 7. GUIDE DES CONSIGNES DE CASIERS & DEVIS BÉNIN ─────────────────── */}
+      <section>
+        <ConsignesGuideSection whatsappNumber={whatsappNumber} />
+      </section>
+
+      {/* ── 8. PUBLICATIONS & ACTUALITÉS BRASSERIE ─────────────────────────── */}
+      {publications.length > 0 && (
+        <section className="my-12">
+          <div className="border-b-2 border-gray-200 pb-2 mb-6">
+            <h3 className="text-xl font-black uppercase text-[#2B2D42] relative after:content-[''] after:absolute after:-bottom-2.5 after:left-0 after:w-16 after:h-0.5 after:bg-[#D10024]">
+              Conseils & Actualités Brasserie
+            </h3>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {publications.map((pub) => (
+              <div
+                key={pub.id}
+                className="bg-white border border-[#E4E7ED] rounded-xl overflow-hidden shadow-sm hover:shadow-md transition flex flex-col justify-between"
+              >
+                {pub.image_url && (
+                  <img
+                    src={pub.image_url}
+                    alt={pub.title}
+                    className="w-full h-44 object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
                   />
-                </StaggerItem>
-              ))}
-            </div>
-          )}
+                )}
+                <div className="p-4 flex-1 flex flex-col">
+                  <h4 className="font-bold text-sm text-gray-900 mb-1.5 leading-snug">
+                    {pub.title}
+                  </h4>
+                  <p className="text-xs text-gray-500 leading-relaxed line-clamp-3 mb-3">
+                    {pub.content}
+                  </p>
+                  {pub.link_url && (
+                    <a
+                      href={pub.link_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-auto inline-flex items-center gap-1 text-xs font-bold text-[#D10024] hover:underline"
+                    >
+                      En savoir plus <ArrowRight className="w-3.5 h-3.5" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         </section>
-      </div>
+      )}
+
+      {/* ── 9. TÉMOIGNAGES CLIENTS & GÉRANTS DE MAQUIS ──────────────────────── */}
+      <section>
+        <TestimonialsSection />
+      </section>
+
+      {/* ── 10. NEWSLETTER & ALERTES ARRIVAGES ─────────────────────────────── */}
+      <section>
+        <NewsletterSection />
+      </section>
+
+      {/* ── 11. QUICK VIEW MODAL ───────────────────────────────────────────── */}
+      {quickViewProduct && (
+        <QuickViewModal
+          product={quickViewProduct}
+          onClose={() => setQuickViewProduct(null)}
+          onAdd={handleAddToCart}
+          onViewProduct={(id) => {
+            setQuickViewProduct(null);
+            setView({ kind: 'product', id });
+          }}
+          whatsappNumber={whatsappNumber}
+        />
+      )}
     </div>
   );
 }

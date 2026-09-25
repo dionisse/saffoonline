@@ -1,5 +1,5 @@
 export type View =
-  | { kind: 'shop' }
+  | { kind: 'shop'; categoryId?: string; search?: string }
   | { kind: 'product'; id: string }
   | { kind: 'cart' }
   | { kind: 'checkout' }

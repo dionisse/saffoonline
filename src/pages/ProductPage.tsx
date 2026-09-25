@@ -9,6 +9,7 @@ import type { Product, ProductOptionGroup, ProductOption } from '../lib/database
 import { useCart, getEffectivePrice } from '../contexts/CartContext';
 import { LazyImage, useRipple, useToast } from '../components/ui';
 import type { View } from '../lib/views';
+import { DEFAULT_PRODUCTS } from '../data/breweryCatalog';
 
 // ─── Image gallery ────────────────────────────────────────────────────────────
 
@@ -93,10 +94,12 @@ function OptionSelector({
   groups,
   selected,
   onSelect,
+  trackStock = true,
 }: {
   groups: ProductOptionGroup[];
   selected: SelectedOptions;
   onSelect: (groupId: string, option: ProductOption) => void;
+  trackStock?: boolean;
 }) {
   if (groups.length === 0) return null;
 
@@ -108,7 +111,7 @@ function OptionSelector({
           <div className="flex flex-wrap gap-2">
             {(group.product_options ?? []).map((opt) => {
               const isSelected = selected[group.id]?.id === opt.id;
-              const isOutOfStock = !product.track_stock ? false : opt.stock === 0;
+              const isOutOfStock = !trackStock ? false : opt.stock === 0;
               return (
                 <button
                   key={opt.id}
@@ -188,7 +191,8 @@ export function ProductPage({ id, setView }: { id: string; setView: (v: View) =>
         .order('sort_order'),
     ]).then(([prod, opts]) => {
       if (!mounted) return;
-      setProduct(prod.data as Product | null);
+      const found = (prod.data as Product | null) ?? DEFAULT_PRODUCTS.find((p) => p.id === id) ?? null;
+      setProduct(found);
       const groups = (opts.data ?? []) as ProductOptionGroup[];
       // Sort options within each group by sort_order
       groups.forEach((g) => {
@@ -197,6 +201,11 @@ export function ProductPage({ id, setView }: { id: string; setView: (v: View) =>
         }
       });
       setOptionGroups(groups);
+      setLoading(false);
+    }).catch(() => {
+      if (!mounted) return;
+      const found = DEFAULT_PRODUCTS.find((p) => p.id === id) ?? null;
+      setProduct(found);
       setLoading(false);
     });
     return () => { mounted = false; };
@@ -263,16 +272,18 @@ export function ProductPage({ id, setView }: { id: string; setView: (v: View) =>
     `Bonjour, je suis intéressé(e) par: ${product.name}${optionLabel ? ` (${optionLabel})` : ''}${product.sku ? ` — SKU: ${product.sku}` : ''}`,
   );
 
+  const currentProduct = product;
+
   function handleAdd(e: React.MouseEvent<HTMLButtonElement>) {
-    if (isOutOfStock || missingSelection) return;
+    if (!currentProduct || isOutOfStock || missingSelection) return;
     ripple(e);
-    addToCart(product, quantity, {
+    addToCart(currentProduct, quantity, {
       optionLabel,
       priceModifier: totalPriceModifier || undefined,
       optionStock: selectedOptionStocks.length > 0 ? Math.min(...selectedOptionStocks) : undefined,
     });
     setAdded(true);
-    toast(`${product.name}${optionLabel ? ` (${optionLabel})` : ''} × ${quantity} ajouté au panier`, 'success');
+    toast(`${currentProduct.name}${optionLabel ? ` (${optionLabel})` : ''} × ${quantity} ajouté au panier`, 'success');
     setTimeout(() => setAdded(false), 2200);
   }
 
@@ -326,7 +337,7 @@ export function ProductPage({ id, setView }: { id: string; setView: (v: View) =>
           )}
 
           {/* Option selector */}
-          <OptionSelector groups={optionGroups} selected={selected} onSelect={handleSelectOption} />
+          <OptionSelector groups={optionGroups} selected={selected} onSelect={handleSelectOption} trackStock={product.track_stock} />
 
           {/* Selection required hint */}
           {missingSelection && (

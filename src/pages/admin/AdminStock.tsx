@@ -50,7 +50,6 @@ const TYPE_META: Record<MovementType, { label: string; color: string; sign: '+' 
 };
 
 const ENTRY_TYPES: MovementType[] = ['purchase', 'stock_in', 'adjustment'];
-const EXIT_TYPES: MovementType[] = ['damaged', 'adjustment'];
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -107,7 +106,6 @@ export function AdminStock() {
     setSavingMov(true);
     setMovError(null);
 
-    const isOut = EXIT_TYPES.includes(movForm.type) && movForm.type !== 'adjustment';
     const isEntry = ENTRY_TYPES.includes(movForm.type);
     const signedQty = (movForm.type === 'damaged') ? -qty
       : (movForm.type === 'adjustment') ? qty   // adjustment is always positive here; negative via negative qty not supported in UI

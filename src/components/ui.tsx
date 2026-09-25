@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect, createContext, useContext, ReactNode } from 'react';
-import { CheckCircle2, AlertCircle, Info, X } from 'lucide-react';
+import { CheckCircle2, AlertCircle, Info } from 'lucide-react';
 
 // ─── LazyImage ────────────────────────────────────────────────────────────────
 // Intersection-observer lazy loading with shimmer skeleton + fade-in
